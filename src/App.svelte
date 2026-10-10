@@ -158,7 +158,7 @@
       {#if workspace}<div class="workspace-label" title={workspace}>{displayWorkspace.toUpperCase()}</div><FileTree path={workspace} onOpen={openFile} />{:else}<div class="empty-sidebar"><span class="empty-glyph">⌂</span><p>Open a folder to browse your files.</p><button class="subtle-button" onclick={chooseWorkspace}>Open Folder</button></div>{/if}
     </aside><div class="resize-bar vertical" role="separator" onpointerdown={(e) => startResize(e, 'sidebar')}></div>{/if}
     <main class="center-column">
-      <div class="tabs-row" onpointerdown={handleTitlebarPointerDown}>
+      <div class="tabs-row" role="group" aria-label="Application controls" onpointerdown={handleTitlebarPointerDown}>
         <div class="workspace-actions">
           <div class="brand"><span class="brand-mark" data-tauri-drag-region>b</span><span data-tauri-drag-region>blank</span></div>
           <button onclick={chooseWorkspace} title="Open folder (Ctrl+Shift+O)">Open folder</button>
