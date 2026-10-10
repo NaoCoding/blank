@@ -11,7 +11,7 @@
   let workspace = $state(''); let documents = $state<Document[]>([]); let activeId = $state('');
   let editorStates = new Map<string, EditorState>(); let sidebarOpen = $state(true); let terminalOpen = $state(false);
   let previewOpen = $state(true); let dark = $state(true); let split = $state(52); let sidebarWidth = $state(232); let terminalHeight = $state(220);
-  let previewHtml = $state(''); let line = $state(1); let column = $state(1); let toast = $state(''); let showQuickOpen = $state(false); let quickQuery = $state('');
+  let previewHtml = $state(''); let previewError = $state(''); let line = $state(1); let column = $state(1); let toast = $state(''); let showQuickOpen = $state(false); let quickQuery = $state('');
   let TerminalPaneComponent = $state<any>(null);
   let recentFiles = $state<string[]>([]); let previewTimer: ReturnType<typeof setTimeout>;
   const appWindow = getCurrentWindow();
@@ -89,7 +89,14 @@
   let previewRevision = 0;
   function updatePreview(value: string) {
     clearTimeout(previewTimer); const revision = ++previewRevision;
-    previewTimer = setTimeout(() => { void import('./lib/markdown').then(({ renderMarkdown }) => { if (revision === previewRevision) previewHtml = renderMarkdown(value); }); }, 120);
+    previewTimer = setTimeout(() => {
+      void import('./lib/markdown')
+        .then(({ renderMarkdown }) => { if (revision === previewRevision) { previewError = ''; previewHtml = renderMarkdown(value); } })
+        .catch(error => {
+          console.error('Markdown preview failed to load', error);
+          if (revision === previewRevision) previewError = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+        });
+    }, 120);
   }
   $effect(() => { if (markdown && previewOpen) updatePreview(active?.content ?? ''); });
   async function toggleTerminal() {
@@ -173,7 +180,7 @@
       </div>
       <div class="work-area" class:with-preview={markdown && previewOpen} style={`--split:${split}%`}>
         {#if active}<section class="editor-pane"><EditorPane doc={active} dark={dark} getState={() => editorStates.get(active.id)} onUpdate={(content,state) => updateDoc(active.id,content,state)} onStatus={(l,c) => { line=l;column=c; }} /></section>
-          {#if markdown && previewOpen}<div class="resize-bar vertical split-resize" role="separator" onpointerdown={(e) => startResize(e, 'split')}></div><section class="preview-pane"><div class="preview-label">PREVIEW</div><article class="markdown-body">{@html previewHtml}</article></section>{/if}
+          {#if markdown && previewOpen}<div class="resize-bar vertical split-resize" role="separator" onpointerdown={(e) => startResize(e, 'split')}></div><section class="preview-pane"><div class="preview-label">PREVIEW</div><article class="markdown-body">{#if previewError}<p class="render-error">Preview could not be loaded: {previewError}</p>{:else}{@html previewHtml}{/if}</article></section>{/if}
         {:else}<section class="welcome"><div class="welcome-content"><div class="welcome-icon">b</div><h1>blank</h1><p>A quiet place to work with text, code, and ideas.</p><div class="welcome-buttons"><button class="primary-button" onclick={chooseWorkspace}>Open Folder</button><button class="subtle-button" onclick={chooseFile}>Open File</button><button class="subtle-button" onclick={newFile}>New File</button></div><div class="shortcut-hint"><kbd>Ctrl</kbd><span>+</span><kbd>P</kbd><span>Quick file open</span></div></div></section>{/if}
       </div>
       {#if terminalOpen}<div class="resize-bar horizontal" role="separator" onpointerdown={(e) => startResize(e, 'terminal')}></div><section class="terminal-panel" style={`height:${terminalHeight}px`}><div class="terminal-heading"><span>TERMINAL</span><span class="terminal-cwd">{workspace || 'Choose a folder first'}</span><button class="icon-button" onclick={() => terminalOpen = false} aria-label="Close terminal">×</button></div>{#if workspace && TerminalPaneComponent}<TerminalPaneComponent cwd={workspace} dark={dark} />{:else}<div class="terminal-empty">Open a folder before starting a terminal.</div>{/if}</section>{/if}
