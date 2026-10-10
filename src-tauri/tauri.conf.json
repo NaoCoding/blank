@@ -5,5 +5,5 @@
   "identifier": "app.blank.editor",
   "build": { "beforeDevCommand": "npm run dev", "devUrl": "http://127.0.0.1:5173", "beforeBuildCommand": "npm run build", "frontendDist": "../dist" },
   "app": { "windows": [{ "title": "blank", "width": 1280, "height": 820, "minWidth": 720, "minHeight": 480 }], "security": { "csp": "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' asset: data:; font-src 'self' asset: data:" } },
-  "bundle": { "active": true, "targets": "all", "icon": [] }
+  "bundle": { "active": true, "targets": "all", "icon": ["icons/icon.ico"] }
 }
