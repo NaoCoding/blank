@@ -80,7 +80,7 @@ fn set_workspace(path: String, state: State<'_, AppState>) -> Result<String, Str
         return Err("Selected workspace is not a directory".into());
     }
     *state.workspace.lock().map_err(|e| e.to_string())? = Some(canonical.clone());
-    Ok(canonical.to_string_lossy().to_string())
+    Ok(dunce::simplified(&canonical).to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -102,8 +102,8 @@ fn resolve_open_file(path: String, state: State<'_, AppState>) -> Result<OpenTar
         None => true,
     };
     Ok(OpenTarget {
-        path: file.to_string_lossy().to_string(),
-        workspace: parent.to_string_lossy().to_string(),
+        path: dunce::simplified(&file).to_string_lossy().to_string(),
+        workspace: dunce::simplified(&parent).to_string_lossy().to_string(),
         needs_workspace,
     })
 }
@@ -239,7 +239,7 @@ fn start_terminal(
     #[cfg(all(unix, not(target_os = "macos")))]
     let mut cmd =
         CommandBuilder::new(std::env::var("SHELL").unwrap_or_else(|_| "/bin/bash".into()));
-    cmd.cwd(workdir);
+    cmd.cwd(dunce::simplified(&workdir));
     let child = pair.slave.spawn_command(cmd).map_err(|e| e.to_string())?;
     drop(pair.slave);
     let id = uuid::Uuid::new_v4().to_string();

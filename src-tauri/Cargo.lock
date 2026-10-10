@@ -134,6 +134,7 @@ dependencies = [
 name = "blank"
 version = "0.1.0"
 dependencies = [
+ "dunce",
  "portable-pty",
  "serde",
  "serde_json",
