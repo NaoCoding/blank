@@ -100,6 +100,13 @@
     await appWindow.toggleMaximize();
     maximized = await appWindow.isMaximized();
   }
+  function handleTitlebarPointerDown(event: PointerEvent) {
+    if (event.button !== 0) return;
+    if (event.target instanceof Element && event.target.closest('button, input, textarea, select, .tab')) return;
+    event.preventDefault();
+    if (event.detail === 2) void toggleWindowMaximize();
+    else void appWindow.startDragging();
+  }
 
   function startResize(event: PointerEvent, target: 'sidebar' | 'split' | 'terminal') {
     event.preventDefault(); const startX = event.clientX, startY = event.clientY;
@@ -144,7 +151,7 @@
       {#if workspace}<div class="workspace-label" title={workspace}>{displayWorkspace.toUpperCase()}</div><FileTree path={workspace} onOpen={openFile} />{:else}<div class="empty-sidebar"><span class="empty-glyph">⌂</span><p>Open a folder to browse your files.</p><button class="subtle-button" onclick={chooseWorkspace}>Open Folder</button></div>{/if}
     </aside><div class="resize-bar vertical" role="separator" onpointerdown={(e) => startResize(e, 'sidebar')}></div>{/if}
     <main class="center-column">
-      <div class="tabs-row">
+      <div class="tabs-row" onpointerdown={handleTitlebarPointerDown}>
         <div class="workspace-actions">
           <div class="brand"><span class="brand-mark" data-tauri-drag-region>b</span><span data-tauri-drag-region>blank</span></div>
           <button onclick={chooseWorkspace} title="Open folder (Ctrl+Shift+O)">Open folder</button>
