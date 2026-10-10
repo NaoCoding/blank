@@ -16,7 +16,7 @@
   const active = $derived(documents.find(d => d.id === activeId));
   const dirtyCount = $derived(documents.filter(isDirty).length);
   const markdown = $derived(active?.language === 'markdown');
-  const displayWorkspace = $derived(workspace.split(/[\\/]/).filter(Boolean).at(-1) ?? 'Open a folder');
+  const displayWorkspace = $derived(workspace.split(/[\\/]/).filter(Boolean).at(-1) ?? 'No folder');
 
   function notify(message: string) { toast = message; setTimeout(() => { if (toast === message) toast = ''; }, 3000); }
   async function chooseWorkspace() {
@@ -128,12 +128,6 @@
 
 <svelte:window onkeydown={keydown} />
 <div class:light={!dark} class="app-shell">
-  <header class="titlebar">
-    <div class="brand"><span class="brand-mark">b</span><span>blank</span></div>
-    <div class="top-actions"><button onclick={chooseWorkspace} title="Open folder (Ctrl+Shift+O)">Open folder</button><button onclick={chooseFile} title="Open file (Ctrl+O)">Open file</button></div>
-    <div class="window-title">{active?.name ?? displayWorkspace}{active && isDirty(active) ? ' •' : ''}</div>
-    <div class="top-actions right"><button onclick={() => { dark = !dark; localStorage.setItem('blank-theme', dark ? 'dark' : 'light'); }} title="Toggle theme">{dark ? '☼' : '☾'}</button><button onclick={toggleTerminal} title="Toggle terminal">⌘</button></div>
-  </header>
   <div class="main-area">
     {#if sidebarOpen}<aside class="sidebar" style={`width:${sidebarWidth}px`}>
       <div class="side-heading"><span>EXPLORER</span><button class="icon-button" onclick={createNewFromDialog} title="New file">＋</button></div>
@@ -141,7 +135,16 @@
     </aside><div class="resize-bar vertical" role="separator" onpointerdown={(e) => startResize(e, 'sidebar')}></div>{/if}
     <main class="center-column">
       <div class="tabs-row">
-        <div class="tabs">{#each documents as doc (doc.id)}<div class:active={doc.id === activeId} class="tab" title={doc.path ?? doc.name}><button class="tab-open" onclick={() => activeId = doc.id}><span class="tab-dot" class:changed={isDirty(doc)}>{isDirty(doc) ? '●' : '◈'}</span><span>{doc.name}</span></button><button class="close-tab" aria-label={`Close ${doc.name}`} onclick={() => closeTab(doc.id)}>×</button></div>{/each}</div>
+        <div class="workspace-actions">
+          <div class="brand"><span class="brand-mark" data-tauri-drag-region>b</span><span data-tauri-drag-region>blank</span></div>
+          <button onclick={chooseWorkspace} title="Open folder (Ctrl+Shift+O)">Open folder</button>
+          <button onclick={chooseFile} title="Open file (Ctrl+O)">Open file</button>
+        </div>
+        <div class="tabs" data-tauri-drag-region>{#each documents as doc (doc.id)}<div class:active={doc.id === activeId} class="tab" title={doc.path ?? doc.name}><button class="tab-open" onclick={() => activeId = doc.id}><span class="tab-dot" class:changed={isDirty(doc)}>{isDirty(doc) ? '●' : '◈'}</span><span>{doc.name}</span></button><button class="close-tab" aria-label={`Close ${doc.name}`} onclick={() => closeTab(doc.id)}>×</button></div>{/each}</div>
+        <div class="workspace-tools">
+          <button class="toolbar-button" onclick={() => { dark = !dark; localStorage.setItem('blank-theme', dark ? 'dark' : 'light'); }} title="Toggle theme">{dark ? '☼' : '☾'}</button>
+          <button class="toolbar-button" onclick={toggleTerminal} title="Toggle terminal">⌘</button>
+        </div>
         {#if markdown}<button class:pressed={previewOpen} class="toolbar-button preview-toggle" onclick={togglePreview}>◫ <span>Preview</span></button>{/if}
       </div>
       <div class="work-area" class:with-preview={markdown && previewOpen} style={`--split:${split}%`}>
