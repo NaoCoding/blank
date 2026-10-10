@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "target": "ES2022", "useDefineForClassFields": true, "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"], "skipLibCheck": true,
+    "moduleResolution": "bundler", "allowImportingTsExtensions": true,
+    "resolveJsonModule": true, "isolatedModules": true, "verbatimModuleSyntax": true,
+    "moduleDetection": "force", "noEmit": true, "strict": true,
+    "types": ["svelte", "vitest/globals"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.svelte", "tests/**/*.ts", "vite.config.ts"]
+}
