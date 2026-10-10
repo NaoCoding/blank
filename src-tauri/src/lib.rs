@@ -198,7 +198,7 @@ fn create_file(
     let mut f = fs::OpenOptions::new()
         .write(true)
         .create_new(true)
-        .open(target)
+        .open(&target)
         .map_err(|e| e.to_string())?;
     f.write_all(contents.as_bytes())
         .map_err(|e| e.to_string())?;
