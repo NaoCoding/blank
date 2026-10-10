@@ -1,4 +1,6 @@
-# blank
+# Blank
+
+![alt text](cover.png)
 
 A small offline desktop editor named blank, built with Tauri 2, Svelte, TypeScript, CodeMirror 6, markdown-it, KaTeX, and xterm.js. It focuses on local text/code editing, a safe Markdown preview, and a real interactive shell.
 
