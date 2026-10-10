@@ -38,9 +38,17 @@
     } catch (e) { notify(`Could not open file: ${e}`); }
   }
   async function chooseFile() {
-    if (!workspace) { await chooseWorkspace(); if (!workspace) return; }
-    const path = await open({ multiple: false, directory: false, title: 'Open File' });
-    if (typeof path === 'string') await openFile(path);
+    try {
+      const path = await open({ multiple: false, directory: false, title: 'Open File' });
+      if (typeof path !== 'string') return;
+      const target = await invoke<{ path: string; workspace: string; needs_workspace: boolean }>('resolve_open_file', { path });
+      if (target.needs_workspace) {
+        if (dirtyCount && !confirm('Discard unsaved changes before opening a file from another folder?')) return;
+        workspace = await invoke<string>('set_workspace', { path: target.workspace });
+        documents = []; editorStates.clear(); activeId = ''; terminalOpen = false;
+      }
+      await openFile(target.path);
+    } catch (e) { notify(`Could not open file: ${e}`); }
   }
   function newFile() { const doc = createDocument(null); documents = [...documents, doc]; activeId = doc.id; }
   async function saveActive(saveAs = false) {

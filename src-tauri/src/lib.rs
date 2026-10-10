@@ -38,6 +38,12 @@ struct FileSnapshot {
     content: String,
     version: String,
 }
+#[derive(Serialize)]
+struct OpenTarget {
+    path: String,
+    workspace: String,
+    needs_workspace: bool,
+}
 
 fn file_version(path: &std::path::Path) -> Result<String, String> {
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
@@ -75,6 +81,31 @@ fn set_workspace(path: String, state: State<'_, AppState>) -> Result<String, Str
     }
     *state.workspace.lock().map_err(|e| e.to_string())? = Some(canonical.clone());
     Ok(canonical.to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn resolve_open_file(path: String, state: State<'_, AppState>) -> Result<OpenTarget, String> {
+    let file = PathBuf::from(path)
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+    if !file.is_file() {
+        return Err("Selected path is not a file".into());
+    }
+    let parent = file
+        .parent()
+        .ok_or("Selected file has no parent folder")?
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+    let root = state.workspace.lock().map_err(|e| e.to_string())?.clone();
+    let needs_workspace = match root {
+        Some(root) => !file.starts_with(root.canonicalize().map_err(|e| e.to_string())?),
+        None => true,
+    };
+    Ok(OpenTarget {
+        path: file.to_string_lossy().to_string(),
+        workspace: parent.to_string_lossy().to_string(),
+        needs_workspace,
+    })
 }
 
 #[tauri::command]
@@ -287,6 +318,7 @@ pub fn run() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             set_workspace,
+            resolve_open_file,
             list_directory,
             read_file,
             write_file,
