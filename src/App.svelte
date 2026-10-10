@@ -168,7 +168,7 @@
           <button aria-label={maximized ? 'Restore' : 'Maximize'} title={maximized ? 'Restore' : 'Maximize'} onclick={toggleWindowMaximize}>
             {#if maximized}<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M4 2.5h5.5V8M8 4.5H2.5V10H8V4.5Z" /></svg>{:else}<svg viewBox="0 0 12 12" aria-hidden="true"><rect x="1.5" y="1.5" width="9" height="9" /></svg>{/if}
           </button>
-          <button class="close-window" aria-label="Close" title="Close" onclick={() => appWindow.close()}><svg viewBox="0 0 12 12" aria-hidden="true"><path d="m3 3 6 6M9 3 3 9" /></svg></button>
+          <button class="close-window" aria-label="Close" title="Close" onclick={() => appWindow.close()}><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5 10.5 10.5M10.5 1.5 1.5 10.5" /></svg></button>
         </div>
       </div>
       <div class="work-area" class:with-preview={markdown && previewOpen} style={`--split:${split}%`}>
