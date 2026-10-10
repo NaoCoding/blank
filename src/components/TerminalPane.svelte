@@ -7,12 +7,13 @@
   let { cwd, dark } = $props<{ cwd: string; dark: boolean }>();
   let host: HTMLDivElement; let terminal: Terminal; let id = ''; let cleanup: UnlistenFn[] = [];
   onMount(async () => {
-    terminal = new Terminal({ cursorBlink: true, fontFamily: 'var(--mono)', fontSize: 12, theme: dark ? { background: '#111315', foreground: '#d9dadd', cursor: '#d6a76c' } : { background: '#fff', foreground: '#25282c', cursor: '#98682d' }, convertEol: true });
+    const fontFamily = getComputedStyle(host).getPropertyValue('--mono').trim();
+    terminal = new Terminal({ cursorBlink: true, fontFamily, fontSize: 13, theme: dark ? { background: '#111315', foreground: '#d9dadd', cursor: '#d6a76c' } : { background: '#fff', foreground: '#25282c', cursor: '#98682d' }, convertEol: true });
     terminal.open(host);
     const fit = () => {
       const fontSize = terminal.options.fontSize ?? 12;
-      const cols = Math.max(2, Math.floor((host.clientWidth - 24) / (fontSize * 0.62)));
-      const rows = Math.max(2, Math.floor((host.clientHeight - 12) / (fontSize * 1.45)));
+      const cols = Math.max(2, Math.floor((host.clientWidth - 24) / (fontSize * 0.6)));
+      const rows = Math.max(2, Math.floor((host.clientHeight - 12) / (fontSize * 1.2)));
       if (terminal.cols !== cols || terminal.rows !== rows) terminal.resize(cols, rows);
       if (id) void invoke('terminal_resize', { id, cols, rows }).catch(() => {});
     };
