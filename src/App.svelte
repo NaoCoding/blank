@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
   import { invoke } from '@tauri-apps/api/core';
+  import { getCurrentWindow } from '@tauri-apps/api/window';
   import { open, save } from '@tauri-apps/plugin-dialog';
   import { EditorState } from '@codemirror/state';
   import EditorPane from './components/EditorPane.svelte';
@@ -13,6 +14,8 @@
   let previewHtml = $state(''); let line = $state(1); let column = $state(1); let toast = $state(''); let showQuickOpen = $state(false); let quickQuery = $state('');
   let TerminalPaneComponent = $state<any>(null);
   let recentFiles = $state<string[]>([]); let previewTimer: ReturnType<typeof setTimeout>;
+  const appWindow = getCurrentWindow();
+  let maximized = $state(false);
   const active = $derived(documents.find(d => d.id === activeId));
   const dirtyCount = $derived(documents.filter(isDirty).length);
   const markdown = $derived(active?.language === 'markdown');
@@ -93,6 +96,10 @@
     if (!TerminalPaneComponent) TerminalPaneComponent = (await import('./components/TerminalPane.svelte')).default;
     terminalOpen = !terminalOpen;
   }
+  async function toggleWindowMaximize() {
+    await appWindow.toggleMaximize();
+    maximized = await appWindow.isMaximized();
+  }
 
   function startResize(event: PointerEvent, target: 'sidebar' | 'split' | 'terminal') {
     event.preventDefault(); const startX = event.clientX, startY = event.clientY;
@@ -121,8 +128,11 @@
   }
   onMount(() => {
     dark = localStorage.getItem('blank-theme') !== 'light';
+    void appWindow.isMaximized().then(value => { maximized = value; });
+    let unlistenResize: (() => void) | undefined;
+    void appWindow.onResized(async () => { maximized = await appWindow.isMaximized(); }).then(unlisten => { unlistenResize = unlisten; });
     const handle = (e: BeforeUnloadEvent) => { if (dirtyCount) { e.preventDefault(); e.returnValue = ''; } };
-    window.addEventListener('beforeunload', handle); return () => { window.removeEventListener('beforeunload', handle); clearTimeout(previewTimer); };
+    window.addEventListener('beforeunload', handle); return () => { unlistenResize?.(); window.removeEventListener('beforeunload', handle); clearTimeout(previewTimer); };
   });
 </script>
 
@@ -146,6 +156,11 @@
           <button class="toolbar-button" onclick={toggleTerminal} title="Toggle terminal">⌘</button>
         </div>
         {#if markdown}<button class:pressed={previewOpen} class="toolbar-button preview-toggle" onclick={togglePreview}>◫ <span>Preview</span></button>{/if}
+        <div class="window-controls">
+          <button aria-label="Minimize" title="Minimize" onclick={() => appWindow.minimize()}><span class="minimize-glyph"></span></button>
+          <button aria-label={maximized ? 'Restore' : 'Maximize'} title={maximized ? 'Restore' : 'Maximize'} onclick={toggleWindowMaximize}><span class:restored={maximized} class="maximize-glyph"></span></button>
+          <button class="close-window" aria-label="Close" title="Close" onclick={() => appWindow.close()}><span>×</span></button>
+        </div>
       </div>
       <div class="work-area" class:with-preview={markdown && previewOpen} style={`--split:${split}%`}>
         {#if active}<section class="editor-pane"><EditorPane doc={active} dark={dark} getState={() => editorStates.get(active.id)} onUpdate={(content,state) => updateDoc(active.id,content,state)} onStatus={(l,c) => { line=l;column=c; }} /></section>
