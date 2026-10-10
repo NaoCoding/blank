@@ -162,7 +162,7 @@
           <button class="toolbar-button" onclick={() => { dark = !dark; localStorage.setItem('blank-theme', dark ? 'dark' : 'light'); }} title="Toggle theme">{dark ? '☼' : '☾'}</button>
           <button class="toolbar-button" onclick={toggleTerminal} title="Toggle terminal">⌘</button>
         </div>
-        {#if markdown}<button class:pressed={previewOpen} class="toolbar-button preview-toggle" onclick={togglePreview}>◫ <span>Preview</span></button>{/if}
+        {#if markdown}<button class:pressed={previewOpen} class="toolbar-button preview-toggle" onclick={togglePreview} aria-pressed={previewOpen} title={`${previewOpen ? 'Hide' : 'Show'} Markdown preview (Ctrl+Shift+P)`}>◫ <span>{previewOpen ? 'Hide preview' : 'Show preview'}</span></button>{/if}
         <div class="window-controls">
           <button aria-label="Minimize" title="Minimize" onclick={() => appWindow.minimize()}><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 6h9" /></svg></button>
           <button aria-label={maximized ? 'Restore' : 'Maximize'} title={maximized ? 'Restore' : 'Maximize'} onclick={toggleWindowMaximize}>
