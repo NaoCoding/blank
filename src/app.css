@@ -31,3 +31,7 @@
 .settings-footer{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;color:var(--muted);font-size:11px}
 .settings-footer .primary-button{padding:7px 16px}
 .settings-modal .icon-button{font-size:20px}
+.tab{position:relative}
+.tab.active{box-shadow:none}
+.tab.active::before{content:"";position:absolute;z-index:2;pointer-events:none;top:0;left:0;right:0;height:2px;background:var(--accent)}
+.close-tab{position:relative;z-index:1;align-self:center;display:grid;place-items:center;width:20px;height:18px;min-height:18px;padding:0;line-height:1;font-size:14px;top:1px;flex:none}

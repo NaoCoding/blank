@@ -23,6 +23,13 @@
   const displayWorkspace = $derived(workspace.split(/[\\/]/).filter(Boolean).at(-1) ?? 'No folder');
 
   function notify(message: string) { toast = message; setTimeout(() => { if (toast === message) toast = ''; }, 3000); }
+  function displayFilePath(path: string | null) {
+    if (!path) return '';
+    const extendedUncPrefix = '\\\\?\\UNC\\';
+    if (path.startsWith(extendedUncPrefix)) return `\\\\${path.slice(extendedUncPrefix.length)}`;
+    const extendedPrefix = '\\\\?\\';
+    return path.startsWith(extendedPrefix) ? path.slice(extendedPrefix.length) : path;
+  }
   function persistSettings() {
     localStorage.setItem('blank-settings', JSON.stringify({ fontSize, explorerEnabled, terminalEnabled, previewEnabled }));
   }
@@ -193,7 +200,7 @@
           <button onclick={chooseWorkspace} title="Open folder (Ctrl+Shift+O)">Open folder</button>
           <button onclick={chooseFile} title="Open file (Ctrl+O)">Open file</button>
         </div>
-        <div class="tabs" data-tauri-drag-region>{#each documents as doc (doc.id)}<div class:active={doc.id === activeId} class="tab" title={doc.path ?? doc.name}><button class="tab-open" onclick={() => activeId = doc.id}><span class="tab-dot" class:changed={isDirty(doc)}>{isDirty(doc) ? '●' : '◈'}</span><span>{doc.name}</span></button><button class="close-tab" aria-label={`Close ${doc.name}`} onclick={() => closeTab(doc.id)}>×</button></div>{/each}</div>
+        <div class="tabs" data-tauri-drag-region>{#each documents as doc (doc.id)}<div class:active={doc.id === activeId} class="tab" title={doc.path ? displayFilePath(doc.path) : doc.name}><button class="tab-open" onclick={() => activeId = doc.id}><span class="tab-dot" class:changed={isDirty(doc)}>{isDirty(doc) ? '●' : '◈'}</span><span>{doc.name}</span></button><button class="close-tab" aria-label={`Close ${doc.name}`} onclick={() => closeTab(doc.id)}>×</button></div>{/each}</div>
         <div class="workspace-tools">
           <button class="toolbar-button" onclick={() => { dark = !dark; localStorage.setItem('blank-theme', dark ? 'dark' : 'light'); }} title="Toggle theme">{dark ? '☼' : '☾'}</button>
           {#if terminalEnabled}<button class="toolbar-button" onclick={toggleTerminal} title="Toggle terminal" aria-label="Toggle terminal">⌘</button>{/if}
