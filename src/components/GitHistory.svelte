@@ -2,7 +2,8 @@
   import { invoke } from '@tauri-apps/api/core';
 
   type Commit = { hash: string; parents: string[]; author: string; date: string; subject: string; refs: string[] };
-  type GraphRow = { commit: Commit; lane: number; width: number; paths: string[] };
+  type GraphPath = { d: string; color: number };
+  type GraphRow = { commit: Commit; lane: number; color: number; width: number; paths: GraphPath[] };
   let { workspace, onClose } = $props<{ workspace: string; onClose: () => void }>();
   let commits = $state<Commit[]>([]);
   let error = $state('');
@@ -10,25 +11,41 @@
 
   function buildGraph(items: Commit[]): GraphRow[] {
     const lanes: string[] = [];
+    const colors: number[] = [];
+    let nextColor = 0;
     return items.map(commit => {
       let lane = lanes.indexOf(commit.hash);
-      if (lane < 0) { lane = lanes.length; lanes.push(commit.hash); }
+      if (lane < 0) {
+        lane = lanes.length;
+        lanes.push(commit.hash);
+        colors.push(nextColor++ % 6);
+      }
+      const commitColor = colors[lane];
       const before = [...lanes];
+      const beforeColors = [...colors];
       const next = [...lanes];
+      const nextColors = [...colors];
       next.splice(lane, 1);
-      if (commit.parents[0]) next.splice(lane, 0, commit.parents[0]);
+      nextColors.splice(lane, 1);
+      if (commit.parents[0] && !next.includes(commit.parents[0])) {
+        next.splice(lane, 0, commit.parents[0]);
+        nextColors.splice(lane, 0, commitColor);
+      }
       let extraLane = lane + (commit.parents[0] ? 1 : 0);
       for (const parent of commit.parents.slice(1)) {
-        if (!next.includes(parent)) next.splice(extraLane, 0, parent);
+        if (!next.includes(parent)) {
+          next.splice(extraLane, 0, parent);
+          nextColors.splice(extraLane, 0, nextColor++ % 6);
+        }
         extraLane++;
       }
       const paths: string[] = [];
-      for (const parent of commit.parents) {
+      for (const [parentIndex, parent] of commit.parents.entries()) {
         const target = next.indexOf(parent);
         if (target >= 0) {
           const x1 = lane * 16 + 9;
           const x2 = target * 16 + 9;
-          paths.push(`M ${x1} 20 C ${x1} 29 ${x2} 32 ${x2} 42`);
+          paths.push({ d: `M ${x1} 24 C ${x1} 34 ${x2} 38 ${x2} 48`, color: parentIndex === 0 ? commitColor : nextColors[target] });
         }
       }
       before.forEach((hash, oldLane) => {
@@ -37,14 +54,16 @@
         if (target < 0) return;
         const x1 = oldLane * 16 + 9;
         const x2 = target * 16 + 9;
-        paths.push(`M ${x1} 0 C ${x1} 14 ${x2} 27 ${x2} 42`);
+        paths.push({ d: `M ${x1} 0 C ${x1} 18 ${x2} 30 ${x2} 48`, color: beforeColors[oldLane] });
       });
       lanes.splice(0, lanes.length, ...next);
-      return { commit, lane, width: Math.max(before.length, next.length, lane + 1), paths };
+      colors.splice(0, colors.length, ...nextColors);
+      return { commit, lane, color: commitColor, width: Math.max(before.length, next.length, lane + 1), paths };
     });
   }
 
   let rows = $derived(buildGraph(commits));
+  let graphWidth = $derived(Math.max(1, ...rows.map(row => row.width)) * 16 + 2);
 
   async function loadHistory() {
     loading = true;
@@ -78,9 +97,9 @@
       <div class="history-list">
         {#each rows as row (row.commit.hash)}
           <article class="commit-row">
-            <svg class="commit-graph" style={`width:${row.width * 16 + 2}px`} viewBox={`0 0 ${row.width * 16 + 2} 42`} aria-hidden="true">
-              {#each row.paths as path, i}<path d={path} class={`graph-edge graph-color-${(row.lane + i) % 6}`} />{/each}
-              <circle cx={row.lane * 16 + 9} cy="20" r={row.commit.parents.length > 1 ? 5 : 4} class:merge={row.commit.parents.length > 1} class={`graph-node graph-color-${row.lane % 6}`} />
+            <svg class="commit-graph" style={`width:${graphWidth}px`} viewBox={`0 0 ${graphWidth} 48`} aria-hidden="true">
+              {#each row.paths as path}<path d={path.d} class={`graph-edge graph-color-${path.color}`} />{/each}
+              <circle cx={row.lane * 16 + 9} cy="24" r={row.commit.parents.length > 1 ? 5 : 4} class:merge={row.commit.parents.length > 1} class={`graph-node graph-color-${row.color}`} />
             </svg>
             <div class="commit-info">
               <div class="commit-title"><strong title={row.commit.subject}>{row.commit.subject || '(no subject)'}</strong>{#each row.commit.refs as ref (ref)}<span class:remote={ref.includes('/')} class="branch-label">{ref}</span>{/each}{#if row.commit.parents.length > 1}<span class="merge-label">MERGE</span>{/if}</div>
