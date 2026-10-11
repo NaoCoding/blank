@@ -11,6 +11,7 @@
   let workspace = $state(''); let documents = $state<Document[]>([]); let activeId = $state('');
   let editorStates = new Map<string, EditorState>(); let sidebarOpen = $state(true); let terminalOpen = $state(false);
   let previewOpen = $state(true); let dark = $state(true); let split = $state(52); let sidebarWidth = $state(232); let terminalHeight = $state(220);
+  let fontSize = $state(13); let explorerEnabled = $state(true); let terminalEnabled = $state(true); let previewEnabled = $state(true); let settingsOpen = $state(false);
   let previewHtml = $state(''); let previewError = $state(''); let line = $state(1); let column = $state(1); let toast = $state(''); let showQuickOpen = $state(false); let quickQuery = $state('');
   let TerminalPaneComponent = $state<any>(null);
   let recentFiles = $state<string[]>([]); let previewTimer: ReturnType<typeof setTimeout>;
@@ -22,6 +23,24 @@
   const displayWorkspace = $derived(workspace.split(/[\\/]/).filter(Boolean).at(-1) ?? 'No folder');
 
   function notify(message: string) { toast = message; setTimeout(() => { if (toast === message) toast = ''; }, 3000); }
+  function persistSettings() {
+    localStorage.setItem('blank-settings', JSON.stringify({ fontSize, explorerEnabled, terminalEnabled, previewEnabled }));
+  }
+  function setExplorerEnabled(enabled: boolean) {
+    explorerEnabled = enabled;
+    if (enabled) sidebarOpen = true;
+    persistSettings();
+  }
+  function setTerminalEnabled(enabled: boolean) {
+    terminalEnabled = enabled;
+    if (!enabled) terminalOpen = false;
+    persistSettings();
+  }
+  function setPreviewEnabled(enabled: boolean) {
+    previewEnabled = enabled;
+    if (!enabled) previewOpen = false;
+    persistSettings();
+  }
   async function chooseWorkspace() {
     const path = await open({ directory: true, multiple: false, title: 'Open Project Folder' });
     if (typeof path !== 'string') return;
@@ -100,6 +119,7 @@
   }
   $effect(() => { if (markdown && previewOpen) updatePreview(active?.content ?? ''); });
   async function toggleTerminal() {
+    if (!terminalEnabled) return;
     if (!TerminalPaneComponent) TerminalPaneComponent = (await import('./components/TerminalPane.svelte')).default;
     terminalOpen = !terminalOpen;
   }
@@ -126,7 +146,7 @@
     const done = () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', done); };
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', done, { once: true });
   }
-  function togglePreview() { if (markdown) previewOpen = !previewOpen; else notify('Preview is available for Markdown files'); }
+  function togglePreview() { if (!previewEnabled) return; if (markdown) previewOpen = !previewOpen; else notify('Preview is available for Markdown files'); }
   function keydown(event: KeyboardEvent) {
     const mod = event.ctrlKey || event.metaKey;
     if (mod && event.key.toLowerCase() === 's') { event.preventDefault(); void saveActive(event.shiftKey); }
@@ -137,11 +157,20 @@
     else if (mod && event.key.toLowerCase() === 'n') { event.preventDefault(); newFile(); }
     else if (mod && event.key.toLowerCase() === 'w') { event.preventDefault(); if (active) closeTab(active.id); }
     else if (mod && event.key.toLowerCase() === 'b') { event.preventDefault(); sidebarOpen = !sidebarOpen; }
-    else if (event.ctrlKey && event.key === '`') { event.preventDefault(); void toggleTerminal(); }
+    else if (event.ctrlKey && event.key === '`' && terminalEnabled) { event.preventDefault(); void toggleTerminal(); }
+    else if (event.key === 'Escape' && settingsOpen) settingsOpen = false;
     else if (event.key === 'Escape' && showQuickOpen) showQuickOpen = false;
   }
   onMount(() => {
     dark = localStorage.getItem('blank-theme') !== 'light';
+    try {
+      const saved = JSON.parse(localStorage.getItem('blank-settings') ?? '{}');
+      if (Number.isFinite(saved.fontSize)) fontSize = Math.min(18, Math.max(11, saved.fontSize));
+      if (typeof saved.explorerEnabled === 'boolean') explorerEnabled = saved.explorerEnabled;
+      if (typeof saved.terminalEnabled === 'boolean') terminalEnabled = saved.terminalEnabled;
+      if (typeof saved.previewEnabled === 'boolean') previewEnabled = saved.previewEnabled;
+      sidebarOpen = explorerEnabled;
+    } catch { /* Keep the defaults if saved settings are invalid. */ }
     void appWindow.isMaximized().then(value => { maximized = value; });
     let unlistenResize: (() => void) | undefined;
     void appWindow.onResized(async () => { maximized = await appWindow.isMaximized(); }).then(unlisten => { unlistenResize = unlisten; });
@@ -151,9 +180,9 @@
 </script>
 
 <svelte:window onkeydown={keydown} />
-<div class:light={!dark} class="app-shell">
+<div class:light={!dark} class="app-shell" style={`--ui-font-size:${fontSize}px`}>
   <div class="main-area">
-    {#if sidebarOpen}<aside class="sidebar" style={`width:${sidebarWidth}px`}>
+    {#if explorerEnabled && sidebarOpen}<aside class="sidebar" style={`width:${sidebarWidth}px`}>
       <div class="side-heading"><span>EXPLORER</span><button class="icon-button" onclick={createNewFromDialog} title="New file">＋</button></div>
       {#if workspace}<div class="workspace-label" title={workspace}>{displayWorkspace.toUpperCase()}</div><FileTree path={workspace} onOpen={openFile} />{:else}<div class="empty-sidebar"><span class="empty-glyph">⌂</span><p>Open a folder to browse your files.</p><button class="subtle-button" onclick={chooseWorkspace}>Open Folder</button></div>{/if}
     </aside><div class="resize-bar vertical" role="separator" onpointerdown={(e) => startResize(e, 'sidebar')}></div>{/if}
@@ -167,9 +196,10 @@
         <div class="tabs" data-tauri-drag-region>{#each documents as doc (doc.id)}<div class:active={doc.id === activeId} class="tab" title={doc.path ?? doc.name}><button class="tab-open" onclick={() => activeId = doc.id}><span class="tab-dot" class:changed={isDirty(doc)}>{isDirty(doc) ? '●' : '◈'}</span><span>{doc.name}</span></button><button class="close-tab" aria-label={`Close ${doc.name}`} onclick={() => closeTab(doc.id)}>×</button></div>{/each}</div>
         <div class="workspace-tools">
           <button class="toolbar-button" onclick={() => { dark = !dark; localStorage.setItem('blank-theme', dark ? 'dark' : 'light'); }} title="Toggle theme">{dark ? '☼' : '☾'}</button>
-          <button class="toolbar-button" onclick={toggleTerminal} title="Toggle terminal">⌘</button>
+          {#if terminalEnabled}<button class="toolbar-button" onclick={toggleTerminal} title="Toggle terminal" aria-label="Toggle terminal">⌘</button>{/if}
+          <button class="toolbar-button settings-button" onclick={() => settingsOpen = true} title="Settings" aria-label="Settings">⚙</button>
         </div>
-        {#if markdown}<button class:pressed={previewOpen} class="toolbar-button preview-toggle" onclick={togglePreview} aria-pressed={previewOpen} title={`${previewOpen ? 'Hide' : 'Show'} Markdown preview (Ctrl+Shift+P)`}>◫ <span>{previewOpen ? 'Hide preview' : 'Show preview'}</span></button>{/if}
+        {#if markdown && previewEnabled}<button class:pressed={previewOpen} class="toolbar-button preview-toggle" onclick={togglePreview} aria-pressed={previewOpen} title={`${previewOpen ? 'Hide' : 'Show'} Markdown preview (Ctrl+Shift+P)`}>◫ <span>{previewOpen ? 'Hide preview' : 'Show preview'}</span></button>{/if}
         <div class="window-controls">
           <button aria-label="Minimize" title="Minimize" onclick={() => appWindow.minimize()}><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 6h9" /></svg></button>
           <button aria-label={maximized ? 'Restore' : 'Maximize'} title={maximized ? 'Restore' : 'Maximize'} onclick={toggleWindowMaximize}>
@@ -178,15 +208,16 @@
           <button class="close-window" aria-label="Close" title="Close" onclick={() => appWindow.close()}><svg viewBox="0 0 12 12" aria-hidden="true"><path d="M1.5 1.5 10.5 10.5M10.5 1.5 1.5 10.5" /></svg></button>
         </div>
       </div>
-      <div class="work-area" class:with-preview={markdown && previewOpen} style={`--split:${split}%`}>
-        {#if active}<section class="editor-pane"><EditorPane doc={active} dark={dark} getState={() => editorStates.get(active.id)} onUpdate={(content,state) => updateDoc(active.id,content,state)} onStatus={(l,c) => { line=l;column=c; }} /></section>
-          {#if markdown && previewOpen}<div class="resize-bar vertical split-resize" role="separator" onpointerdown={(e) => startResize(e, 'split')}></div><section class="preview-pane"><div class="preview-label">PREVIEW</div><article class="markdown-body">{#if previewError}<p class="render-error">Preview could not be loaded: {previewError}</p>{:else}{@html previewHtml}{/if}</article></section>{/if}
+      <div class="work-area" class:with-preview={markdown && previewEnabled && previewOpen} style={`--split:${split}%`}>
+        {#if active}<section class="editor-pane"><EditorPane doc={active} dark={dark} {fontSize} getState={() => editorStates.get(active.id)} onUpdate={(content,state) => updateDoc(active.id,content,state)} onStatus={(l,c) => { line=l;column=c; }} /></section>
+          {#if markdown && previewEnabled && previewOpen}<div class="resize-bar vertical split-resize" role="separator" onpointerdown={(e) => startResize(e, 'split')}></div><section class="preview-pane"><div class="preview-label">PREVIEW</div><article class="markdown-body">{#if previewError}<p class="render-error">Preview could not be loaded: {previewError}</p>{:else}{@html previewHtml}{/if}</article></section>{/if}
         {:else}<section class="welcome"><div class="welcome-content"><div class="welcome-icon">b</div><h1>blank</h1><p>A quiet place to work with text, code, and ideas.</p><div class="welcome-buttons"><button class="primary-button" onclick={chooseWorkspace}>Open Folder</button><button class="subtle-button" onclick={chooseFile}>Open File</button><button class="subtle-button" onclick={newFile}>New File</button></div><div class="shortcut-hint"><kbd>Ctrl</kbd><span>+</span><kbd>P</kbd><span>Quick file open</span></div></div></section>{/if}
       </div>
-      {#if terminalOpen}<div class="resize-bar horizontal" role="separator" onpointerdown={(e) => startResize(e, 'terminal')}></div><section class="terminal-panel" style={`height:${terminalHeight}px`}><div class="terminal-heading"><span>TERMINAL</span><span class="terminal-cwd">{workspace || 'Choose a folder first'}</span><button class="icon-button" onclick={() => terminalOpen = false} aria-label="Close terminal">×</button></div>{#if workspace && TerminalPaneComponent}<TerminalPaneComponent cwd={workspace} dark={dark} />{:else}<div class="terminal-empty">Open a folder before starting a terminal.</div>{/if}</section>{/if}
+      {#if terminalOpen && terminalEnabled}<div class="resize-bar horizontal" role="separator" onpointerdown={(e) => startResize(e, 'terminal')}></div><section class="terminal-panel" style={`height:${terminalHeight}px`}><div class="terminal-heading"><span>TERMINAL</span><span class="terminal-cwd">{workspace || 'Choose a folder first'}</span><button class="icon-button" onclick={() => terminalOpen = false} aria-label="Close terminal">×</button></div>{#if workspace && TerminalPaneComponent}<TerminalPaneComponent cwd={workspace} {dark} {fontSize} />{:else}<div class="terminal-empty">Open a folder before starting a terminal.</div>{/if}</section>{/if}
     </main>
   </div>
   <footer class="statusbar"><div class="status-left"><span class="status-icon">⌘</span><span>{displayWorkspace}</span>{#if dirtyCount}<span>{dirtyCount} unsaved</span>{/if}</div><div class="status-right">{#if active}<span>Ln {line}, Col {column}</span><span>{active.language === 'markdown' ? 'Markdown' : active.language === 'plaintext' ? 'Plain Text' : active.language.toUpperCase()}</span><span>UTF-8</span>{/if}<button class="status-theme" onclick={() => { dark = !dark; localStorage.setItem('blank-theme',dark?'dark':'light'); }}>{dark ? 'Dark' : 'Light'}</button></div></footer>
   {#if toast}<div class="toast">{toast}</div>{/if}
+  {#if settingsOpen}<div class="modal-backdrop settings-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) settingsOpen = false; }}><div class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title"><header class="settings-heading"><div><span class="settings-eyebrow">PREFERENCES</span><h2 id="settings-title">Settings</h2></div><button class="icon-button" onclick={() => settingsOpen = false} aria-label="Close settings">×</button></header><div class="settings-section"><label class="font-size-setting" for="font-size"><span><strong>Font size</strong><small>Adjust the interface, editor, and terminal text.</small></span><span class="font-size-value">{fontSize}px</span></label><input id="font-size" class="font-size-slider" type="range" min="11" max="18" step="1" bind:value={fontSize} oninput={persistSettings} /><div class="slider-scale"><span>11px</span><span>18px</span></div></div><div class="settings-section components-section"><h3>Components</h3><label class="setting-row"><span><strong>Explorer</strong><small>Browse and open files in the workspace.</small></span><input type="checkbox" checked={explorerEnabled} onchange={(event) => setExplorerEnabled(event.currentTarget.checked)} /></label><label class="setting-row"><span><strong>Terminal</strong><small>Open an integrated terminal panel.</small></span><input type="checkbox" checked={terminalEnabled} onchange={(event) => setTerminalEnabled(event.currentTarget.checked)} /></label><label class="setting-row"><span><strong>Markdown preview</strong><small>Show a live preview beside Markdown files.</small></span><input type="checkbox" checked={previewEnabled} onchange={(event) => setPreviewEnabled(event.currentTarget.checked)} /></label></div><footer class="settings-footer"><span>Changes are saved automatically.</span><button class="primary-button" onclick={() => settingsOpen = false}>Done</button></footer></div></div>{/if}
   {#if showQuickOpen}<div class="modal-backdrop"><div class="quick-modal"><input bind:value={quickQuery} placeholder="Search open and recent files…" onkeydown={(e) => { if(e.key==='Enter'){const p=recentFiles.find(x=>x.toLowerCase().includes(quickQuery.toLowerCase()));if(p)void openFile(p);showQuickOpen=false;} }} /><div class="quick-list">{#each recentFiles.filter(p => p.toLowerCase().includes(quickQuery.toLowerCase())).slice(0,10) as p}<button onclick={() => { void openFile(p);showQuickOpen=false; }}><span>◈</span>{p.split(/[\\/]/).at(-1)}<small>{p}</small></button>{/each}{#if !recentFiles.length}<p>Open a file first to see it here.</p>{/if}</div></div></div>{/if}
 </div>

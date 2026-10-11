@@ -7,3 +7,27 @@
 
 .tab-open{flex:1;min-width:0;display:flex;align-items:center;gap:8px;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer}.close-tab{border:0;background:transparent;color:var(--muted);cursor:pointer;padding:1px 3px;border-radius:3px}.close-tab:hover{background:var(--hover);color:var(--text)}
 .editor-pane{height:100%;min-height:0}.editor-host{height:100%;min-height:0;min-width:0}.editor-host .cm-editor{height:100%;min-height:0}
+.app-shell{font-size:var(--ui-font-size,13px)}
+.tabs-row,.tree-row,.workspace-actions button{font-size:var(--ui-font-size,13px)}
+.toolbar-button{font-size:calc(var(--ui-font-size,13px) * .85)}
+.statusbar{font-size:calc(var(--ui-font-size,13px) * .8)}
+.welcome p{font-size:var(--ui-font-size,13px)}
+.settings-button{font-size:14px!important}
+.settings-backdrop{align-items:flex-start;padding:9vh 16px 24px;overflow:auto}
+.settings-modal{width:min(460px,94vw);height:max-content;background:var(--panel);border:1px solid var(--line);box-shadow:0 18px 56px #0009;border-radius:10px;overflow:hidden;color:var(--text)}
+.settings-heading{display:flex;align-items:center;justify-content:space-between;padding:20px 22px 16px;border-bottom:1px solid var(--line)}
+.settings-eyebrow{font-size:10px;letter-spacing:.12em;font-weight:700;color:var(--accent)}
+.settings-heading h2{font-size:20px;font-weight:550;margin:5px 0 0}
+.settings-section{padding:18px 22px;border-bottom:1px solid var(--line)}
+.font-size-setting,.setting-row{display:flex;align-items:center;justify-content:space-between;gap:16px}
+.font-size-setting strong,.setting-row strong{display:block;font-size:13px;font-weight:550}
+.font-size-setting small,.setting-row small{display:block;margin-top:4px;color:var(--muted);font-size:11px;line-height:1.45}
+.font-size-value{color:var(--accent);font:12px var(--mono);padding:5px 8px;border-radius:5px;background:var(--panel-2)}
+.font-size-slider{display:block;width:100%;margin:20px 0 4px;accent-color:var(--accent);cursor:pointer}
+.slider-scale{display:flex;justify-content:space-between;color:var(--dim);font:10px var(--mono)}
+.components-section h3{margin:0 0 6px;font-size:11px;color:var(--muted);font-weight:650;letter-spacing:.08em;text-transform:uppercase}
+.setting-row{padding:11px 0}
+.setting-row input{width:16px;height:16px;flex:none;accent-color:var(--accent);cursor:pointer}
+.settings-footer{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;color:var(--muted);font-size:11px}
+.settings-footer .primary-button{padding:7px 16px}
+.settings-modal .icon-button{font-size:20px}
