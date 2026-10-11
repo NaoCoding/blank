@@ -101,10 +101,10 @@
   .history-eyebrow { color:var(--accent); font-size:9px; font-weight:700; letter-spacing:.16em; }
   .history-header h2 { margin:3px 0 4px; font-size:18px; font-weight:600; }
   .history-header p { max-width:70vw; margin:0; overflow:hidden; color:var(--dim); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
-  .history-actions { display:flex; align-items:center; gap:8px; }
-  .history-refresh,.history-close { border:0; background:transparent; color:var(--muted); border-radius:5px; cursor:pointer; }
-  .history-refresh { font-size:19px; padding:5px 8px; }
-  .history-close { font-size:24px; padding:3px 8px; }
+  .history-actions { display:flex; align-items:center; gap:6px; }
+  .history-refresh,.history-close { width:32px; height:32px; display:grid; place-items:center; padding:0; border:0; background:transparent; color:var(--muted); border-radius:5px; cursor:pointer; line-height:1; }
+  .history-refresh { font-size:18px; }
+  .history-close { font-size:22px; }
   .history-refresh:hover,.history-close:hover { background:var(--hover); color:var(--text); }
   .history-message { flex:1; display:grid; place-items:center; padding:24px; color:var(--muted); text-align:center; }
   .history-list { flex:1; overflow:auto; padding:8px 18px 10px; }
