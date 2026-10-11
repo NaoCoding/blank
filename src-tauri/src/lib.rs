@@ -4,6 +4,7 @@ use std::{
     collections::HashMap,
     fs,
     io::{Read, Write},
+    process::Command,
     path::PathBuf,
     sync::Mutex,
     thread,
@@ -44,6 +45,28 @@ struct OpenTarget {
     workspace: String,
     needs_workspace: bool,
 }
+#[derive(Serialize)]
+struct GitWorktree {
+    path: String,
+    head: String,
+    branch: Option<String>,
+    detached: bool,
+    current: bool,
+}
+#[derive(Serialize)]
+struct GitWorktrees {
+    repository: String,
+    worktrees: Vec<GitWorktree>,
+}
+#[derive(Serialize)]
+struct GitCommit {
+    hash: String,
+    parents: Vec<String>,
+    author: String,
+    date: String,
+    subject: String,
+    refs: Vec<String>,
+}
 
 fn file_version(path: &std::path::Path) -> Result<String, String> {
     let metadata = fs::metadata(path).map_err(|e| e.to_string())?;
@@ -81,6 +104,154 @@ fn set_workspace(path: String, state: State<'_, AppState>) -> Result<String, Str
     }
     *state.workspace.lock().map_err(|e| e.to_string())? = Some(canonical.clone());
     Ok(dunce::simplified(&canonical).to_string_lossy().to_string())
+}
+
+#[tauri::command]
+fn git_worktrees(state: State<'_, AppState>) -> Result<GitWorktrees, String> {
+    let workspace = state
+        .workspace
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone()
+        .ok_or("Open a project folder first")?;
+    let workspace = workspace.canonicalize().map_err(|e| e.to_string())?;
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&workspace)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if !output.status.success() {
+        return Err("This folder is not inside a Git repository".into());
+    }
+    let repository = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let repository_path = PathBuf::from(&repository)
+        .canonicalize()
+        .map_err(|e| e.to_string())?;
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&repository_path)
+        .args(["worktree", "list", "--porcelain"])
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+
+    let output = String::from_utf8_lossy(&output.stdout);
+    let mut worktrees = Vec::new();
+    let mut path: Option<String> = None;
+    let mut head = String::new();
+    let mut branch = None;
+    let mut detached = false;
+    let push_worktree = |worktrees: &mut Vec<GitWorktree>, path: &mut Option<String>, head: &mut String, branch: &mut Option<String>, detached: &mut bool| {
+        if let Some(path) = path.take() {
+            let path_buf = PathBuf::from(&path);
+            let current = path_buf.canonicalize().map(|p| workspace.starts_with(p)).unwrap_or(false);
+            worktrees.push(GitWorktree {
+                path,
+                head: std::mem::take(head),
+                branch: branch.take(),
+                detached: std::mem::replace(detached, false),
+                current,
+            });
+        }
+    };
+    for line in output.lines() {
+        if line.is_empty() {
+            push_worktree(&mut worktrees, &mut path, &mut head, &mut branch, &mut detached);
+        } else if let Some(value) = line.strip_prefix("worktree ") {
+            path = Some(value.to_string());
+        } else if let Some(value) = line.strip_prefix("HEAD ") {
+            head = value.to_string();
+        } else if let Some(value) = line.strip_prefix("branch refs/heads/") {
+            branch = Some(value.to_string());
+        } else if line == "detached" {
+            detached = true;
+        }
+    }
+    push_worktree(&mut worktrees, &mut path, &mut head, &mut branch, &mut detached);
+    Ok(GitWorktrees {
+        repository: dunce::simplified(&repository_path).to_string_lossy().to_string(),
+        worktrees,
+    })
+}
+
+#[tauri::command]
+fn git_history(state: State<'_, AppState>) -> Result<Vec<GitCommit>, String> {
+    let workspace = state
+        .workspace
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone()
+        .ok_or("Open a project folder first")?;
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&workspace)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if !output.status.success() {
+        return Err("This folder is not inside a Git repository".into());
+    }
+    let repository = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&repository)
+        .args([
+            "for-each-ref",
+            "--format=%(refname:short)%00%(objectname)",
+            "refs/heads",
+            "refs/remotes",
+        ])
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    let mut refs_by_hash: HashMap<String, Vec<String>> = HashMap::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        if let Some((name, hash)) = line.split_once('\0') {
+            refs_by_hash
+                .entry(hash.to_string())
+                .or_default()
+                .push(name.to_string());
+        }
+    }
+
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&repository)
+        .args([
+            "log",
+            "--all",
+            "HEAD",
+            "--topo-order",
+            "-n",
+            "300",
+            "--format=%H%x1f%P%x1f%an%x1f%ar%x1f%s",
+        ])
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    let mut commits = Vec::new();
+    for line in String::from_utf8_lossy(&output.stdout).lines() {
+        let fields: Vec<_> = line.splitn(5, '\u{1f}').collect();
+        if fields.len() != 5 {
+            continue;
+        }
+        commits.push(GitCommit {
+            hash: fields[0].to_string(),
+            parents: fields[1].split_whitespace().map(str::to_string).collect(),
+            author: fields[2].to_string(),
+            date: fields[3].to_string(),
+            subject: fields[4].to_string(),
+            refs: refs_by_hash.remove(fields[0]).unwrap_or_default(),
+        });
+    }
+    Ok(commits)
 }
 
 #[tauri::command]
@@ -441,6 +612,8 @@ pub fn run() {
         .manage(AppState::default())
         .invoke_handler(tauri::generate_handler![
             set_workspace,
+            git_worktrees,
+            git_history,
             resolve_open_file,
             list_directory,
             read_file,

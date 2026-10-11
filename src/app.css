@@ -9,6 +9,7 @@
 .editor-pane{height:100%;min-height:0}.editor-host{height:100%;min-height:0;min-width:0}.editor-host .cm-editor{height:100%;min-height:0}
 .app-shell{font-size:var(--ui-font-size,13px)}
 .tabs-row,.tree-row,.workspace-actions button{font-size:var(--ui-font-size,13px)}
+.file-tree-container{flex:1;min-height:0;overflow:auto}
 .toolbar-button{font-size:calc(var(--ui-font-size,13px) * .85)}
 .statusbar{font-size:calc(var(--ui-font-size,13px) * .8)}
 .welcome p{font-size:var(--ui-font-size,13px)}
