@@ -29,6 +29,32 @@
   function imageUrl(path: string, version: string) {
     return `${convertFileSrc(path)}?v=${encodeURIComponent(version)}`;
   }
+  async function savePastedImage(file: File): Promise<string | null> {
+    const markdownPath = active?.language === 'markdown' ? active.path : null;
+    if (!markdownPath) { notify('Save the Markdown file before pasting an image.'); return null; }
+    const extensionByType: Record<string, string> = {
+      'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif',
+      'image/webp': 'webp', 'image/bmp': 'bmp', 'image/svg+xml': 'svg'
+    };
+    const extension = extensionByType[file.type.toLowerCase().split(';')[0]];
+    if (!extension) { notify(`Pasted image format is not supported: ${file.type || 'unknown'}`); return null; }
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      let binary = '';
+      for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+        binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+      }
+      const name = await invoke<string>('save_pasted_image', {
+        markdownPath,
+        base64Image: btoa(binary),
+        extension
+      });
+      return `![alt text](${name})`;
+    } catch (error) {
+      notify(`Could not save pasted image: ${error}`);
+      return null;
+    }
+  }
   function persistSettings() {
     localStorage.setItem('blank-settings', JSON.stringify({ fontSize, explorerEnabled, terminalEnabled, previewEnabled }));
   }
@@ -301,7 +327,7 @@
         </div>
       </div>
       <div class="work-area" class:with-preview={markdown && previewEnabled && previewOpen} style={`--split:${split}%`}>
-        {#if active}{#if active.language === 'image'}<section class="image-viewer"><img src={imageSources[active.id] ?? ''} alt={active.name} /></section>{:else}<section class="editor-pane"><EditorPane doc={active} dark={dark} {fontSize} getState={() => editorStates.get(active.id)} onUpdate={(content,state) => updateDoc(active.id,content,state)} onStatus={(l,c) => { line=l;column=c; }} /></section>{/if}
+        {#if active}{#if active.language === 'image'}<section class="image-viewer"><img src={imageSources[active.id] ?? ''} alt={active.name} /></section>{:else}<section class="editor-pane"><EditorPane doc={active} dark={dark} {fontSize} getState={() => editorStates.get(active.id)} onUpdate={(content,state) => updateDoc(active.id,content,state)} onStatus={(l,c) => { line=l;column=c; }} onPasteImage={savePastedImage} /></section>{/if}
           {#if markdown && previewEnabled && previewOpen}<div class="resize-bar vertical split-resize" role="separator" onpointerdown={(e) => startResize(e, 'split')}></div><section class="preview-pane"><div class="preview-label">PREVIEW</div><article class="markdown-body">{#if previewError}<p class="render-error">Preview could not be loaded: {previewError}</p>{:else}{@html previewHtml}{/if}</article></section>{/if}
         {:else}<section class="welcome"><div class="welcome-content"><div class="welcome-icon">b</div><h1>blank</h1><p>A quiet place to work with text, code, and ideas.</p><div class="welcome-buttons"><button class="primary-button" onclick={chooseWorkspace}>Open Folder</button><button class="subtle-button" onclick={chooseFile}>Open File</button><button class="subtle-button" onclick={newFile}>New File</button></div><div class="shortcut-hint"><kbd>Ctrl</kbd><span>+</span><kbd>P</kbd><span>Quick file open</span></div></div></section>{/if}
       </div>

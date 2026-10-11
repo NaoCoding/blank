@@ -192,6 +192,70 @@ fn allow_image_asset(
 }
 
 #[tauri::command]
+fn save_pasted_image(
+    markdown_path: String,
+    base64_image: String,
+    extension: String,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    use base64::Engine;
+
+    if base64_image.len() > 70 * 1024 * 1024 {
+        return Err("Pasted images must be smaller than 50 MB".into());
+    }
+    let bytes = base64::engine::general_purpose::STANDARD
+        .decode(base64_image)
+        .map_err(|_| "Could not read the pasted image data")?;
+    if bytes.is_empty() {
+        return Err("The pasted image is empty".into());
+    }
+    if bytes.len() > 50 * 1024 * 1024 {
+        return Err("Pasted images must be smaller than 50 MB".into());
+    }
+    let extension = extension.to_ascii_lowercase();
+    if !matches!(
+        extension.as_str(),
+        "png" | "jpg" | "gif" | "webp" | "bmp" | "svg"
+    ) {
+        return Err("This pasted image format is not supported".into());
+    }
+
+    let root = state.workspace.lock().map_err(|e| e.to_string())?.clone();
+    let markdown = authorized(&root, &markdown_path)?;
+    if !markdown.is_file() {
+        return Err("Save the Markdown file before pasting an image".into());
+    }
+    let parent = markdown
+        .parent()
+        .ok_or("Markdown file has no parent folder")?;
+
+    for index in 1..=10_000 {
+        let name = if index == 1 {
+            format!("image.{extension}")
+        } else {
+            format!("image{index}.{extension}")
+        };
+        let target = parent.join(&name);
+        match fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&target)
+        {
+            Ok(mut file) => {
+                if let Err(error) = file.write_all(&bytes) {
+                    let _ = fs::remove_file(&target);
+                    return Err(error.to_string());
+                }
+                return Ok(name);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => continue,
+            Err(error) => return Err(error.to_string()),
+        }
+    }
+    Err("Could not find an available image filename".into())
+}
+
+#[tauri::command]
 fn write_file(
     path: String,
     contents: String,
@@ -361,6 +425,7 @@ pub fn run() {
             read_file,
             get_file_version,
             allow_image_asset,
+            save_pasted_image,
             write_file,
             create_file,
             start_terminal,

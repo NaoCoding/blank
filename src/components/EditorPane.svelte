@@ -6,9 +6,10 @@
   import { bracketMatching, indentOnInput, syntaxHighlighting, defaultHighlightStyle, StreamLanguage } from '@codemirror/language';
   import type { Document } from '../lib/documents';
 
-  let { doc, dark, fontSize, getState, onUpdate, onStatus } = $props<{
+  let { doc, dark, fontSize, getState, onUpdate, onStatus, onPasteImage } = $props<{
     doc: Document; dark: boolean; fontSize: number; getState: () => EditorState | undefined;
     onUpdate: (content: string, state: EditorState) => void; onStatus: (line: number, column: number) => void;
+    onPasteImage: (file: File) => Promise<string | null>;
   }>();
   let host: HTMLDivElement;
   let view: EditorView | undefined;
@@ -41,11 +42,29 @@
       default: return [];
     }
   };
+  const pasteImageExtension = EditorView.domEventHandlers({
+    paste(event, editor) {
+      if (doc.language !== 'markdown' || !event.clipboardData) return false;
+      const imageItem = Array.from(event.clipboardData.items).find(item => item.kind === 'file' && item.type.startsWith('image/'));
+      const file = imageItem?.getAsFile() ?? Array.from(event.clipboardData.files).find(item => item.type.startsWith('image/'));
+      if (!file) return false;
+      event.preventDefault();
+      void onPasteImage(file).then((markdown: string | null) => {
+        if (!markdown) return;
+        editor.dispatch(editor.state.changeByRange(range => ({
+          changes: { from: range.from, to: range.to, insert: markdown },
+          range: EditorSelection.cursor(range.from + markdown.length)
+        })));
+      });
+      return true;
+    }
+  });
   function createState(): EditorState {
     return getState() ?? EditorState.create({ doc: doc.content, extensions: [
       lineNumbers(), highlightActiveLine(), highlightSpecialChars(), history(),
       indentOnInput(), bracketMatching(), rectangularSelection(), crosshairCursor(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }), theme(dark, fontSize),
+      pasteImageExtension,
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       EditorView.updateListener.of(update => {
         if (update.docChanged) onUpdate(update.state.doc.toString(), update.state);
@@ -59,6 +78,7 @@
     if (doc.id !== activeId) { const next = getState() ?? EditorState.create({ doc: doc.content, extensions: [
       lineNumbers(), highlightActiveLine(), highlightSpecialChars(), history(), indentOnInput(), bracketMatching(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }), theme(dark, fontSize),
+      pasteImageExtension,
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       EditorView.updateListener.of(update => { if (update.docChanged) onUpdate(update.state.doc.toString(), update.state); if (update.selectionSet || update.docChanged) { const p=update.state.selection.main.head,l=update.state.doc.lineAt(p);onStatus(l.number,p-l.from+1); } })
     ] }); view.setState(next); activeId = doc.id; }
@@ -84,7 +104,7 @@
     let cancelled = false;
     void langExtension(language).then(lang => {
       if (cancelled || view !== current) return;
-      current.dispatch({ effects: StateEffect.reconfigure.of([lineNumbers(), highlightActiveLine(), highlightSpecialChars(), history(), indentOnInput(), bracketMatching(), syntaxHighlighting(defaultHighlightStyle, { fallback: true }), lang, theme(isDark, size), keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]), EditorView.updateListener.of(update => { if(update.docChanged) onUpdate(update.state.doc.toString(),update.state); if(update.selectionSet || update.docChanged){const p=update.state.selection.main.head,l=update.state.doc.lineAt(p);onStatus(l.number,p-l.from+1);} })]) });
+      current.dispatch({ effects: StateEffect.reconfigure.of([lineNumbers(), highlightActiveLine(), highlightSpecialChars(), history(), indentOnInput(), bracketMatching(), syntaxHighlighting(defaultHighlightStyle, { fallback: true }), lang, theme(isDark, size), pasteImageExtension, keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]), EditorView.updateListener.of(update => { if(update.docChanged) onUpdate(update.state.doc.toString(),update.state); if(update.selectionSet || update.docChanged){const p=update.state.selection.main.head,l=update.state.doc.lineAt(p);onStatus(l.number,p-l.from+1);} })]) });
     });
     return () => { cancelled = true; };
   });
