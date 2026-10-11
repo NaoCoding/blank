@@ -1,15 +1,16 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { invoke } from '@tauri-apps/api/core';
+  import { convertFileSrc, invoke } from '@tauri-apps/api/core';
   import { getCurrentWindow } from '@tauri-apps/api/window';
   import { open, save } from '@tauri-apps/plugin-dialog';
   import { EditorState } from '@codemirror/state';
   import EditorPane from './components/EditorPane.svelte';
   import FileTree from './components/FileTree.svelte';
-  import { createDocument, isDirty, saveDocument, type Document } from './lib/documents';
+  import { createDocument, isDirty, isImagePath, saveDocument, type Document } from './lib/documents';
   import { displayFilePath } from './lib/paths';
 
   let workspace = $state(''); let documents = $state<Document[]>([]); let activeId = $state('');
+  let imageSources = $state<Record<string, string>>({});
   let editorStates = new Map<string, EditorState>(); let sidebarOpen = $state(true); let terminalOpen = $state(false);
   let previewOpen = $state(true); let dark = $state(true); let split = $state(52); let sidebarWidth = $state(232); let terminalHeight = $state(220);
   let fontSize = $state(13); let explorerEnabled = $state(true); let terminalEnabled = $state(true); let previewEnabled = $state(true); let settingsOpen = $state(false);
@@ -25,6 +26,9 @@
   const displayWorkspace = $derived(workspace.split(/[\\/]/).filter(Boolean).at(-1) ?? 'No folder');
 
   function notify(message: string) { toast = message; setTimeout(() => { if (toast === message) toast = ''; }, 3000); }
+  function imageUrl(path: string, version: string) {
+    return `${convertFileSrc(path)}?v=${encodeURIComponent(version)}`;
+  }
   function persistSettings() {
     localStorage.setItem('blank-settings', JSON.stringify({ fontSize, explorerEnabled, terminalEnabled, previewEnabled }));
   }
@@ -49,7 +53,7 @@
     if (dirtyCount && !confirm('Discard unsaved changes before opening another folder?')) return;
     try {
       const nextWorkspace = await invoke<string>('set_workspace', { path });
-      if (nextWorkspace !== workspace) { documents = []; editorStates.clear(); externalChangeVersions.clear(); activeId = ''; terminalOpen = false; }
+      if (nextWorkspace !== workspace) { documents = []; editorStates.clear(); externalChangeVersions.clear(); imageSources = {}; activeId = ''; terminalOpen = false; }
       workspace = nextWorkspace; notify(`Opened ${workspace}`);
     }
     catch (e) { notify(String(e)); }
@@ -57,6 +61,14 @@
   async function openFile(path: string) {
     const existing = documents.find(d => d.path === path); if (existing) { activeId = existing.id; return; }
     try {
+      if (isImagePath(path)) {
+        const assetPath = await invoke<string>('allow_image_asset', { path, relativeTo: null });
+        const version = await invoke<string>('get_file_version', { path });
+        const doc = { ...createDocument(path), version };
+        imageSources = { ...imageSources, [doc.id]: imageUrl(assetPath, version) };
+        documents = [...documents, doc]; activeId = doc.id; recentFiles = [path, ...recentFiles.filter(p => p !== path)].slice(0, 40);
+        return;
+      }
       const snapshot = await invoke<{ content: string; version: string }>('read_file', { path });
       const doc = { ...createDocument(path, snapshot.content), version: snapshot.version }; documents = [...documents, doc]; activeId = doc.id; recentFiles = [path, ...recentFiles.filter(p => p !== path)].slice(0, 40);
     } catch (e) { notify(`Could not open file: ${e}`); }
@@ -76,6 +88,17 @@
               notify(`${current.name} changed outside blank. Your edits are preserved.`);
             }
             externalChangeVersions.set(current.id, version);
+            return;
+          }
+          if (current.language === 'image') {
+            const assetPath = await invoke<string>('allow_image_asset', { path: current.path, relativeTo: null });
+            const latest = documents.find(doc => doc.id === current.id);
+            if (!latest) return;
+            const snapshot = await invoke<string>('get_file_version', { path: current.path });
+            documents = documents.map(doc => doc.id === latest.id ? { ...doc, version: snapshot } : doc);
+            imageSources = { ...imageSources, [latest.id]: imageUrl(assetPath, snapshot) };
+            externalChangeVersions.delete(latest.id);
+            notify(`Updated ${latest.name} from disk`);
             return;
           }
           const snapshot = await invoke<{ content: string; version: string }>('read_file', { path: opened.path });
@@ -108,14 +131,14 @@
       if (target.needs_workspace) {
         if (dirtyCount && !confirm('Discard unsaved changes before opening a file from another folder?')) return;
         workspace = await invoke<string>('set_workspace', { path: target.workspace });
-        documents = []; editorStates.clear(); externalChangeVersions.clear(); activeId = ''; terminalOpen = false;
+        documents = []; editorStates.clear(); externalChangeVersions.clear(); imageSources = {}; activeId = ''; terminalOpen = false;
       }
       await openFile(target.path);
     } catch (e) { notify(`Could not open file: ${e}`); }
   }
   function newFile() { const doc = createDocument(null); documents = [...documents, doc]; activeId = doc.id; }
   async function saveActive(saveAs = false) {
-    if (!active) return;
+    if (!active || active.language === 'image') return;
     let path: string | null = active.path;
     if (!path || saveAs) {
       path = await save({ title: 'Save File', defaultPath: [workspace, active.name].filter(Boolean).join('\\'), filters: [{ name: 'Text', extensions: ['*'] }] });
@@ -136,7 +159,9 @@
   function closeTab(id: string) {
     const doc = documents.find(d => d.id === id); if (!doc) return;
     if (isDirty(doc) && !confirm(`Discard unsaved changes to ${doc.name}?`)) return;
-    editorStates.delete(id); externalChangeVersions.delete(id); documents = documents.filter(d => d.id !== id);
+    editorStates.delete(id); externalChangeVersions.delete(id);
+    const nextImageSources = { ...imageSources }; delete nextImageSources[id]; imageSources = nextImageSources;
+    documents = documents.filter(d => d.id !== id);
     if (activeId === id) activeId = documents.at(-1)?.id ?? '';
   }
   async function createNewFromDialog() {
@@ -147,18 +172,43 @@
     catch (e) { notify(`Could not create file: ${e}`); }
   }
   let previewRevision = 0;
-  function updatePreview(value: string) {
+  function updatePreview(value: string, markdownPath: string | null) {
     clearTimeout(previewTimer); const revision = ++previewRevision;
+    if (!markdownPath) { previewHtml = ''; return; }
     previewTimer = setTimeout(() => {
       void import('./lib/markdown')
-        .then(({ renderMarkdown }) => { if (revision === previewRevision) { previewError = ''; previewHtml = renderMarkdown(value); } })
+        .then(async ({ renderMarkdown }) => {
+          if (revision !== previewRevision) return;
+          previewError = '';
+          const container = document.createElement('div');
+          container.innerHTML = renderMarkdown(value);
+          await Promise.all(Array.from(container.querySelectorAll('img')).map(async image => {
+            const source = image.getAttribute('src');
+            if (!source || /^(?:https?:|data:|blob:|\/\/)/i.test(source)) return;
+            try {
+              const [pathname, fragment = ''] = source.split('#', 2);
+              const localPath = pathname.split('?', 1)[0];
+              const decodedPath = decodeURIComponent(localPath);
+              const workspaceRelative = decodedPath.startsWith('/') ? decodedPath.replace(/^\/+/, '') : decodedPath;
+              const relativeTo = decodedPath.startsWith('/') ? null : markdownPath;
+              const assetPath = await invoke<string>('allow_image_asset', { path: workspaceRelative, relativeTo });
+              const version = await invoke<string>('get_file_version', { path: assetPath });
+              image.src = `${imageUrl(assetPath, version)}${fragment ? `#${fragment}` : ''}`;
+            } catch {
+              image.removeAttribute('src');
+              image.classList.add('image-unavailable');
+              if (!image.alt) image.alt = 'Image unavailable';
+            }
+          }));
+          if (revision === previewRevision) previewHtml = container.innerHTML;
+        })
         .catch(error => {
           console.error('Markdown preview failed to load', error);
           if (revision === previewRevision) previewError = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
         });
     }, 120);
   }
-  $effect(() => { if (markdown && previewOpen) updatePreview(active?.content ?? ''); });
+  $effect(() => { if (markdown && previewOpen) updatePreview(active?.content ?? '', active?.path ?? null); });
   async function toggleTerminal() {
     if (!terminalEnabled) return;
     if (!TerminalPaneComponent) TerminalPaneComponent = (await import('./components/TerminalPane.svelte')).default;
@@ -251,14 +301,14 @@
         </div>
       </div>
       <div class="work-area" class:with-preview={markdown && previewEnabled && previewOpen} style={`--split:${split}%`}>
-        {#if active}<section class="editor-pane"><EditorPane doc={active} dark={dark} {fontSize} getState={() => editorStates.get(active.id)} onUpdate={(content,state) => updateDoc(active.id,content,state)} onStatus={(l,c) => { line=l;column=c; }} /></section>
+        {#if active}{#if active.language === 'image'}<section class="image-viewer"><img src={imageSources[active.id] ?? ''} alt={active.name} /></section>{:else}<section class="editor-pane"><EditorPane doc={active} dark={dark} {fontSize} getState={() => editorStates.get(active.id)} onUpdate={(content,state) => updateDoc(active.id,content,state)} onStatus={(l,c) => { line=l;column=c; }} /></section>{/if}
           {#if markdown && previewEnabled && previewOpen}<div class="resize-bar vertical split-resize" role="separator" onpointerdown={(e) => startResize(e, 'split')}></div><section class="preview-pane"><div class="preview-label">PREVIEW</div><article class="markdown-body">{#if previewError}<p class="render-error">Preview could not be loaded: {previewError}</p>{:else}{@html previewHtml}{/if}</article></section>{/if}
         {:else}<section class="welcome"><div class="welcome-content"><div class="welcome-icon">b</div><h1>blank</h1><p>A quiet place to work with text, code, and ideas.</p><div class="welcome-buttons"><button class="primary-button" onclick={chooseWorkspace}>Open Folder</button><button class="subtle-button" onclick={chooseFile}>Open File</button><button class="subtle-button" onclick={newFile}>New File</button></div><div class="shortcut-hint"><kbd>Ctrl</kbd><span>+</span><kbd>P</kbd><span>Quick file open</span></div></div></section>{/if}
       </div>
       {#if terminalOpen && terminalEnabled}<div class="resize-bar horizontal" role="separator" onpointerdown={(e) => startResize(e, 'terminal')}></div><section class="terminal-panel" style={`height:${terminalHeight}px`}><div class="terminal-heading"><span>TERMINAL</span><span class="terminal-cwd">{workspace || 'Choose a folder first'}</span><button class="icon-button" onclick={() => terminalOpen = false} aria-label="Close terminal">×</button></div>{#if workspace && TerminalPaneComponent}<TerminalPaneComponent cwd={workspace} {dark} {fontSize} />{:else}<div class="terminal-empty">Open a folder before starting a terminal.</div>{/if}</section>{/if}
     </main>
   </div>
-  <footer class="statusbar"><div class="status-left"><span class="status-icon">⌘</span><span>{displayWorkspace}</span>{#if dirtyCount}<span>{dirtyCount} unsaved</span>{/if}</div><div class="status-right">{#if active}<span>Ln {line}, Col {column}</span><span>{active.language === 'markdown' ? 'Markdown' : active.language === 'plaintext' ? 'Plain Text' : active.language.toUpperCase()}</span><span>UTF-8</span>{/if}<button class="status-theme" onclick={() => { dark = !dark; localStorage.setItem('blank-theme',dark?'dark':'light'); }}>{dark ? 'Dark' : 'Light'}</button></div></footer>
+  <footer class="statusbar"><div class="status-left"><span class="status-icon">⌘</span><span>{displayWorkspace}</span>{#if dirtyCount}<span>{dirtyCount} unsaved</span>{/if}</div><div class="status-right">{#if active}{#if active.language !== 'image'}<span>Ln {line}, Col {column}</span>{/if}<span>{active.language === 'markdown' ? 'Markdown' : active.language === 'plaintext' ? 'Plain Text' : active.language === 'image' ? 'Image' : active.language.toUpperCase()}</span>{#if active.language !== 'image'}<span>UTF-8</span>{/if}{/if}<button class="status-theme" onclick={() => { dark = !dark; localStorage.setItem('blank-theme',dark?'dark':'light'); }}>{dark ? 'Dark' : 'Light'}</button></div></footer>
   {#if toast}<div class="toast">{toast}</div>{/if}
   {#if settingsOpen}<div class="modal-backdrop settings-backdrop" role="presentation" onclick={(event) => { if (event.target === event.currentTarget) settingsOpen = false; }}><div class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title"><header class="settings-heading"><div><span class="settings-eyebrow">PREFERENCES</span><h2 id="settings-title">Settings</h2></div><button class="icon-button" onclick={() => settingsOpen = false} aria-label="Close settings">×</button></header><div class="settings-section"><label class="font-size-setting" for="font-size"><span><strong>Font size</strong><small>Adjust the interface, editor, and terminal text.</small></span><span class="font-size-value">{fontSize}px</span></label><input id="font-size" class="font-size-slider" type="range" min="11" max="18" step="1" bind:value={fontSize} oninput={persistSettings} /><div class="slider-scale"><span>11px</span><span>18px</span></div></div><div class="settings-section components-section"><h3>Components</h3><label class="setting-row"><span><strong>Explorer</strong><small>Browse and open files in the workspace.</small></span><input type="checkbox" checked={explorerEnabled} onchange={(event) => setExplorerEnabled(event.currentTarget.checked)} /></label><label class="setting-row"><span><strong>Terminal</strong><small>Open an integrated terminal panel.</small></span><input type="checkbox" checked={terminalEnabled} onchange={(event) => setTerminalEnabled(event.currentTarget.checked)} /></label><label class="setting-row"><span><strong>Markdown preview</strong><small>Show a live preview beside Markdown files.</small></span><input type="checkbox" checked={previewEnabled} onchange={(event) => setPreviewEnabled(event.currentTarget.checked)} /></label></div><footer class="settings-footer"><span>Changes are saved automatically.</span><button class="primary-button" onclick={() => settingsOpen = false}>Done</button></footer></div></div>{/if}
   {#if showQuickOpen}<div class="modal-backdrop"><div class="quick-modal"><input bind:value={quickQuery} placeholder="Search open and recent files…" onkeydown={(e) => { if(e.key==='Enter'){const p=recentFiles.find(x=>x.toLowerCase().includes(quickQuery.toLowerCase()));if(p)void openFile(p);showQuickOpen=false;} }} /><div class="quick-list">{#each recentFiles.filter(p => p.toLowerCase().includes(quickQuery.toLowerCase())).slice(0,10) as p}<button onclick={() => { void openFile(p);showQuickOpen=false; }}><span>◈</span>{p.split(/[\\/]/).at(-1)}<small>{p}</small></button>{/each}{#if !recentFiles.length}<p>Open a file first to see it here.</p>{/if}</div></div></div>{/if}

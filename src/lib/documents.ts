@@ -5,8 +5,12 @@ export type Document = {
 
 export const isDirty = (doc: Pick<Document, 'content' | 'saved'>) => doc.content !== doc.saved;
 
+const imageExtensions = new Set(['png', 'jpg', 'jpeg', 'gif', 'webp', 'bmp', 'svg', 'ico', 'avif', 'tif', 'tiff']);
+export const isImagePath = (path: string) => imageExtensions.has(path.split('.').pop()?.toLowerCase() ?? '');
+
 export function languageFromPath(path: string): string {
   const ext = path.split('.').pop()?.toLowerCase() ?? '';
+  if (imageExtensions.has(ext)) return 'image';
   const names: Record<string, string> = {
     md: 'markdown', markdown: 'markdown', mdown: 'markdown', txt: 'plaintext', log: 'plaintext',
     js: 'javascript', jsx: 'javascript', mjs: 'javascript', cjs: 'javascript', ts: 'typescript', tsx: 'typescript',

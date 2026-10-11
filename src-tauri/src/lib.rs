@@ -9,7 +9,7 @@ use std::{
     thread,
     time::UNIX_EPOCH,
 };
-use tauri::{Emitter, State};
+use tauri::{Emitter, Manager, State};
 
 #[derive(Default)]
 struct AppState {
@@ -158,6 +158,37 @@ fn get_file_version(path: String, state: State<'_, AppState>) -> Result<String, 
     let root = state.workspace.lock().map_err(|e| e.to_string())?.clone();
     let file = authorized(&root, &path)?;
     file_version(&file)
+}
+
+#[tauri::command]
+fn allow_image_asset(
+    app: tauri::AppHandle,
+    path: String,
+    relative_to: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<String, String> {
+    let root = state.workspace.lock().map_err(|e| e.to_string())?.clone();
+    let root = root.as_ref().ok_or("Open a project folder first")?;
+    let requested = PathBuf::from(path);
+    let target = if requested.is_absolute() {
+        requested
+    } else if let Some(base_file) = relative_to {
+        let base_file = PathBuf::from(base_file);
+        base_file
+            .parent()
+            .ok_or("Invalid Markdown file path")?
+            .join(requested)
+    } else {
+        root.join(requested)
+    };
+    let file = authorized(&Some(root.clone()), &target.to_string_lossy())?;
+    if !file.is_file() {
+        return Err("Image file does not exist".into());
+    }
+    app.asset_protocol_scope()
+        .allow_file(&file)
+        .map_err(|e| e.to_string())?;
+    Ok(dunce::simplified(&file).to_string_lossy().to_string())
 }
 
 #[tauri::command]
@@ -329,6 +360,7 @@ pub fn run() {
             list_directory,
             read_file,
             get_file_version,
+            allow_image_asset,
             write_file,
             create_file,
             start_terminal,
