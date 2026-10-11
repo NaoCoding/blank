@@ -1,5 +1,6 @@
 <script lang="ts">
   import { invoke } from '@tauri-apps/api/core';
+  import { displayFilePath } from '../lib/paths';
   import FileTree from './FileTree.svelte';
   type Entry = { name: string; path: string; is_dir: boolean };
   let { path, depth = 0, onOpen } = $props<{ path: string; depth?: number; onOpen: (path: string) => void }>();
@@ -32,10 +33,10 @@
   }
 </script>
 <div class="tree-node">
-  <button class="tree-row folder-row" style={`--depth:${depth}`} onclick={toggle} title={path}>
+  <button class="tree-row folder-row" style={`--depth:${depth}`} onclick={toggle} title={displayFilePath(path)}>
     <span class="tree-spacer"></span><span class="file-icon folder-icon">{expanded ? '▾' : '▸'}</span><span class="tree-label">{path.split(/[\\/]/).pop()}</span>{#if loading}<span class="muted">…</span>{/if}
   </button>
   {#if expanded}{#each entries as item (item.path)}
-    {#if item.is_dir}<FileTree path={item.path} depth={depth + 1} {onOpen} />{:else}<button class="tree-row" style={`--depth:${depth + 1}`} onclick={() => onOpen(item.path)} title={item.path}><span class="tree-spacer"></span><span class="file-icon">{item.name.endsWith('.md') ? '◈' : '·'}</span><span class="tree-label">{item.name}</span></button>{/if}
+    {#if item.is_dir}<FileTree path={item.path} depth={depth + 1} {onOpen} />{:else}<button class="tree-row" style={`--depth:${depth + 1}`} onclick={() => onOpen(item.path)} title={displayFilePath(item.path)}><span class="tree-spacer"></span><span class="file-icon">{item.name.endsWith('.md') ? '◈' : '·'}</span><span class="tree-label">{item.name}</span></button>{/if}
   {/each}{/if}
 </div>

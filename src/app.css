@@ -34,4 +34,5 @@
 .tab{position:relative}
 .tab.active{box-shadow:none}
 .tab.active::before{content:"";position:absolute;z-index:2;pointer-events:none;top:0;left:0;right:0;height:2px;background:var(--accent)}
-.close-tab{position:relative;z-index:1;align-self:center;display:grid;place-items:center;width:20px;height:18px;min-height:18px;padding:0;line-height:1;font-size:14px;top:1px;flex:none}
+.tab{min-height:22px}
+.close-tab{position:relative;z-index:1;align-self:center;display:grid;place-items:center;width:20px;height:20px;min-height:20px;padding:0;line-height:1;font-size:16px;top:1px;flex:none}

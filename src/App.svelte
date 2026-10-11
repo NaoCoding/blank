@@ -7,6 +7,7 @@
   import EditorPane from './components/EditorPane.svelte';
   import FileTree from './components/FileTree.svelte';
   import { createDocument, isDirty, saveDocument, type Document } from './lib/documents';
+  import { displayFilePath } from './lib/paths';
 
   let workspace = $state(''); let documents = $state<Document[]>([]); let activeId = $state('');
   let editorStates = new Map<string, EditorState>(); let sidebarOpen = $state(true); let terminalOpen = $state(false);
@@ -23,13 +24,6 @@
   const displayWorkspace = $derived(workspace.split(/[\\/]/).filter(Boolean).at(-1) ?? 'No folder');
 
   function notify(message: string) { toast = message; setTimeout(() => { if (toast === message) toast = ''; }, 3000); }
-  function displayFilePath(path: string | null) {
-    if (!path) return '';
-    const extendedUncPrefix = '\\\\?\\UNC\\';
-    if (path.startsWith(extendedUncPrefix)) return `\\\\${path.slice(extendedUncPrefix.length)}`;
-    const extendedPrefix = '\\\\?\\';
-    return path.startsWith(extendedPrefix) ? path.slice(extendedPrefix.length) : path;
-  }
   function persistSettings() {
     localStorage.setItem('blank-settings', JSON.stringify({ fontSize, explorerEnabled, terminalEnabled, previewEnabled }));
   }
