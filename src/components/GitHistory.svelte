@@ -117,15 +117,15 @@
   .history-backdrop { position:fixed; inset:0; z-index:12; display:grid; place-items:center; padding:5vh 5vw; background:#0009; }
   .history-dialog { width:min(1050px,92vw); height:min(820px,90vh); display:flex; flex-direction:column; overflow:hidden; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:9px; box-shadow:0 20px 70px #0009; }
   .history-header { flex:none; display:flex; align-items:center; justify-content:space-between; padding:18px 22px 15px; border-bottom:1px solid var(--line); }
-  .history-eyebrow { color:var(--accent); font-size:9px; font-weight:700; letter-spacing:.16em; }
-  .history-header h2 { margin:3px 0 4px; font-size:18px; font-weight:600; }
-  .history-header p { max-width:70vw; margin:0; overflow:hidden; color:var(--dim); font-size:11px; text-overflow:ellipsis; white-space:nowrap; }
+  .history-eyebrow { color:var(--accent); font-size:calc(var(--ui-font-size,13px) * .7); font-weight:700; letter-spacing:.16em; }
+  .history-header h2 { margin:3px 0 4px; font-size:calc(var(--ui-font-size,13px) * 1.4); font-weight:600; }
+  .history-header p { max-width:70vw; margin:0; overflow:hidden; color:var(--dim); font-size:calc(var(--ui-font-size,13px) * .85); text-overflow:ellipsis; white-space:nowrap; }
   .history-actions { display:flex; align-items:center; gap:6px; }
   .history-refresh,.history-close { width:32px; height:32px; display:grid; place-items:center; padding:0; border:0; background:transparent; color:var(--muted); border-radius:5px; cursor:pointer; line-height:1; }
   .history-refresh { font-size:18px; }
   .history-close { font-size:22px; }
   .history-refresh:hover,.history-close:hover { background:var(--hover); color:var(--text); }
-  .history-message { flex:1; display:grid; place-items:center; padding:24px; color:var(--muted); text-align:center; }
+  .history-message { flex:1; display:grid; place-items:center; padding:24px; color:var(--muted); font-size:var(--ui-font-size,13px); text-align:center; }
   .history-list { flex:1; overflow:auto; padding:8px 18px 10px; }
   .commit-row { min-height:48px; display:flex; align-items:stretch; border-bottom:1px solid color-mix(in srgb,var(--line) 55%,transparent); }
   .commit-graph { flex:none; height:48px; overflow:visible; }
@@ -140,12 +140,12 @@
   .graph-color-5 { stroke:#b18ada; fill:#b18ada; }
   .commit-info { min-width:0; flex:1; align-self:center; padding:6px 10px; }
   .commit-title { min-width:0; display:flex; align-items:center; gap:7px; }
-  .commit-title strong { min-width:0; overflow:hidden; font-size:12px; font-weight:500; text-overflow:ellipsis; white-space:nowrap; }
-  .branch-label,.merge-label { flex:none; max-width:180px; overflow:hidden; padding:2px 6px; border:1px solid color-mix(in srgb,var(--accent) 45%,transparent); border-radius:10px; color:var(--accent); font-size:9px; text-overflow:ellipsis; white-space:nowrap; }
+  .commit-title strong { min-width:0; overflow:hidden; font-size:var(--ui-font-size,13px); font-weight:500; text-overflow:ellipsis; white-space:nowrap; }
+  .branch-label,.merge-label { flex:none; max-width:180px; overflow:hidden; padding:2px 6px; border:1px solid color-mix(in srgb,var(--accent) 45%,transparent); border-radius:10px; color:var(--accent); font-size:calc(var(--ui-font-size,13px) * .7); text-overflow:ellipsis; white-space:nowrap; }
   .branch-label.remote { border-color:var(--line); color:var(--dim); }
   .merge-label { border-color:#879be055; color:#9cace5; }
-  .commit-meta { display:flex; align-items:center; gap:12px; margin-top:4px; color:var(--dim); font-size:10px; }
-  .commit-meta code { color:var(--muted); font:10px var(--mono); }
-  .history-footer { flex:none; padding:8px 20px; border-top:1px solid var(--line); color:var(--dim); font-size:10px; }
+  .commit-meta { display:flex; align-items:center; gap:12px; margin-top:4px; color:var(--dim); font-size:calc(var(--ui-font-size,13px) * .78); }
+  .commit-meta code { color:var(--muted); font:calc(var(--ui-font-size,13px) * .78) var(--mono); }
+  .history-footer { flex:none; padding:8px 20px; border-top:1px solid var(--line); color:var(--dim); font-size:calc(var(--ui-font-size,13px) * .78); }
   @media(max-width:650px) { .history-backdrop{padding:2vh 2vw}.history-dialog{width:96vw;height:96vh}.history-header{padding:14px}.commit-meta{gap:7px}.commit-meta span:nth-child(2){display:none}.branch-label{max-width:100px} }
 </style>

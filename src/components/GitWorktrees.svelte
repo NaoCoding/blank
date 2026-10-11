@@ -57,7 +57,7 @@
 
 <style>
   .worktrees { flex:none; border-top:1px solid var(--line); padding-bottom:6px; }
-  .worktrees-heading { height:32px; display:flex; align-items:center; justify-content:space-between; padding:0 10px 0 12px; color:var(--muted); font-size:10px; font-weight:600; letter-spacing:.08em; }
+  .worktrees-heading { height:32px; display:flex; align-items:center; justify-content:space-between; padding:0 10px 0 12px; color:var(--muted); font-size:calc(var(--ui-font-size,13px) * .77); font-weight:600; letter-spacing:.08em; }
   .refresh-button { border:0; background:transparent; color:var(--muted); border-radius:4px; cursor:pointer; font-size:16px; line-height:1; padding:3px 5px; }
   .refresh-button:hover { background:var(--hover); color:var(--text); }
   .refresh-button:disabled { opacity:.5; cursor:default; }
@@ -66,8 +66,8 @@
   .worktree-icon { flex:none; width:13px; color:var(--accent); font-size:15px; text-align:center; }
   .worktree-details { min-width:0; flex:1; display:flex; flex-direction:column; gap:2px; }
   .worktree-branch,.worktree-path { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
-  .worktree-branch { font-size:11px; }
-  .worktree-path { color:var(--dim); font-size:10px; }
-  .current-badge { flex:none; color:var(--accent); font-size:8px; letter-spacing:.04em; }
-  .worktrees-message { margin:0; padding:6px 12px 9px; color:var(--dim); font-size:10px; line-height:1.5; overflow-wrap:anywhere; }
+  .worktree-branch { font-size:calc(var(--ui-font-size,13px) * .85); }
+  .worktree-path { color:var(--dim); font-size:calc(var(--ui-font-size,13px) * .77); }
+  .current-badge { flex:none; color:var(--accent); font-size:calc(var(--ui-font-size,13px) * .62); letter-spacing:.04em; }
+  .worktrees-message { margin:0; padding:6px 12px 9px; color:var(--dim); font-size:calc(var(--ui-font-size,13px) * .77); line-height:1.5; overflow-wrap:anywhere; }
 </style>
