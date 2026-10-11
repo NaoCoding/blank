@@ -154,6 +154,13 @@ fn read_file(path: String, state: State<'_, AppState>) -> Result<FileSnapshot, S
 }
 
 #[tauri::command]
+fn get_file_version(path: String, state: State<'_, AppState>) -> Result<String, String> {
+    let root = state.workspace.lock().map_err(|e| e.to_string())?.clone();
+    let file = authorized(&root, &path)?;
+    file_version(&file)
+}
+
+#[tauri::command]
 fn write_file(
     path: String,
     contents: String,
@@ -321,6 +328,7 @@ pub fn run() {
             resolve_open_file,
             list_directory,
             read_file,
+            get_file_version,
             write_file,
             create_file,
             start_terminal,

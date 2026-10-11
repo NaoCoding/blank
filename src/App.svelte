@@ -15,7 +15,8 @@
   let fontSize = $state(13); let explorerEnabled = $state(true); let terminalEnabled = $state(true); let previewEnabled = $state(true); let settingsOpen = $state(false);
   let previewHtml = $state(''); let previewError = $state(''); let line = $state(1); let column = $state(1); let toast = $state(''); let showQuickOpen = $state(false); let quickQuery = $state('');
   let TerminalPaneComponent = $state<any>(null);
-  let recentFiles = $state<string[]>([]); let previewTimer: ReturnType<typeof setTimeout>;
+  let recentFiles = $state<string[]>([]); let previewTimer: ReturnType<typeof setTimeout>; let filePollInFlight = false;
+  const externalChangeVersions = new Map<string, string>();
   const appWindow = getCurrentWindow();
   let maximized = $state(false);
   const active = $derived(documents.find(d => d.id === activeId));
@@ -48,7 +49,7 @@
     if (dirtyCount && !confirm('Discard unsaved changes before opening another folder?')) return;
     try {
       const nextWorkspace = await invoke<string>('set_workspace', { path });
-      if (nextWorkspace !== workspace) { documents = []; editorStates.clear(); activeId = ''; terminalOpen = false; }
+      if (nextWorkspace !== workspace) { documents = []; editorStates.clear(); externalChangeVersions.clear(); activeId = ''; terminalOpen = false; }
       workspace = nextWorkspace; notify(`Opened ${workspace}`);
     }
     catch (e) { notify(String(e)); }
@@ -60,6 +61,45 @@
       const doc = { ...createDocument(path, snapshot.content), version: snapshot.version }; documents = [...documents, doc]; activeId = doc.id; recentFiles = [path, ...recentFiles.filter(p => p !== path)].slice(0, 40);
     } catch (e) { notify(`Could not open file: ${e}`); }
   }
+  async function refreshOpenFiles() {
+    if (filePollInFlight) return;
+    filePollInFlight = true;
+    try {
+      const openFiles = documents.filter((doc): doc is Document & { path: string } => Boolean(doc.path));
+      await Promise.all(openFiles.map(async opened => {
+        try {
+          const version = await invoke<string>('get_file_version', { path: opened.path });
+          const current = documents.find(doc => doc.id === opened.id);
+          if (!current || current.version === version) return;
+          if (isDirty(current)) {
+            if (externalChangeVersions.get(current.id) !== version) {
+              notify(`${current.name} changed outside blank. Your edits are preserved.`);
+            }
+            externalChangeVersions.set(current.id, version);
+            return;
+          }
+          const snapshot = await invoke<{ content: string; version: string }>('read_file', { path: opened.path });
+          const latest = documents.find(doc => doc.id === opened.id);
+          if (!latest) return;
+          if (isDirty(latest)) {
+            if (externalChangeVersions.get(latest.id) !== snapshot.version) {
+              notify(`${latest.name} changed outside blank. Your edits are preserved.`);
+            }
+            externalChangeVersions.set(latest.id, snapshot.version);
+            return;
+          }
+          if (latest.version === snapshot.version && latest.content === snapshot.content) return;
+          documents = documents.map(doc => doc.id === latest.id
+            ? { ...doc, content: snapshot.content, saved: snapshot.content, version: snapshot.version }
+            : doc);
+          externalChangeVersions.delete(latest.id);
+          notify(`Updated ${latest.name} from disk`);
+        } catch { /* A file may be briefly unavailable while another app is saving it. */ }
+      }));
+    } finally {
+      filePollInFlight = false;
+    }
+  }
   async function chooseFile() {
     try {
       const path = await open({ multiple: false, directory: false, title: 'Open File' });
@@ -68,7 +108,7 @@
       if (target.needs_workspace) {
         if (dirtyCount && !confirm('Discard unsaved changes before opening a file from another folder?')) return;
         workspace = await invoke<string>('set_workspace', { path: target.workspace });
-        documents = []; editorStates.clear(); activeId = ''; terminalOpen = false;
+        documents = []; editorStates.clear(); externalChangeVersions.clear(); activeId = ''; terminalOpen = false;
       }
       await openFile(target.path);
     } catch (e) { notify(`Could not open file: ${e}`); }
@@ -86,7 +126,7 @@
         ? await invoke<string>('write_file', { path, contents: active.content, expectedVersion: active.version })
         : await invoke<string>('create_file', { path, contents: active.content });
       const saved = saveDocument(active, path, version);
-      documents = documents.map(d => d.id === active.id ? saved : d); activeId = saved.id; notify('Saved');
+      documents = documents.map(d => d.id === active.id ? saved : d); externalChangeVersions.delete(active.id); activeId = saved.id; notify('Saved');
     } catch (e) { notify(`Could not save file: ${e}`); }
   }
   function updateDoc(id: string, content: string, state: EditorState) {
@@ -96,7 +136,7 @@
   function closeTab(id: string) {
     const doc = documents.find(d => d.id === id); if (!doc) return;
     if (isDirty(doc) && !confirm(`Discard unsaved changes to ${doc.name}?`)) return;
-    editorStates.delete(id); documents = documents.filter(d => d.id !== id);
+    editorStates.delete(id); externalChangeVersions.delete(id); documents = documents.filter(d => d.id !== id);
     if (activeId === id) activeId = documents.at(-1)?.id ?? '';
   }
   async function createNewFromDialog() {
@@ -176,7 +216,8 @@
     let unlistenResize: (() => void) | undefined;
     void appWindow.onResized(async () => { maximized = await appWindow.isMaximized(); }).then(unlisten => { unlistenResize = unlisten; });
     const handle = (e: BeforeUnloadEvent) => { if (dirtyCount) { e.preventDefault(); e.returnValue = ''; } };
-    window.addEventListener('beforeunload', handle); return () => { unlistenResize?.(); window.removeEventListener('beforeunload', handle); clearTimeout(previewTimer); };
+    const filePoll = setInterval(() => { void refreshOpenFiles(); }, 1000);
+    window.addEventListener('beforeunload', handle); return () => { unlistenResize?.(); window.removeEventListener('beforeunload', handle); clearTimeout(previewTimer); clearInterval(filePoll); };
   });
 </script>
 

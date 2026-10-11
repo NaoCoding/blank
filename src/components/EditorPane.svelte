@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
-  import { EditorState, StateEffect, type Extension } from '@codemirror/state';
+  import { EditorSelection, EditorState, StateEffect, type Extension } from '@codemirror/state';
   import { EditorView, lineNumbers, highlightActiveLine, keymap, highlightSpecialChars, rectangularSelection, crosshairCursor } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
   import { bracketMatching, indentOnInput, syntaxHighlighting, defaultHighlightStyle, StreamLanguage } from '@codemirror/language';
@@ -62,6 +62,21 @@
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       EditorView.updateListener.of(update => { if (update.docChanged) onUpdate(update.state.doc.toString(), update.state); if (update.selectionSet || update.docChanged) { const p=update.state.selection.main.head,l=update.state.doc.lineAt(p);onStatus(l.number,p-l.from+1); } })
     ] }); view.setState(next); activeId = doc.id; }
+  });
+  $effect(() => {
+    if (!view || doc.id !== activeId) return;
+    const current = view;
+    const content = doc.content;
+    if (current.state.doc.toString() === content) return;
+    const selection = current.state.selection;
+    const clamp = (position: number) => Math.min(position, content.length);
+    current.dispatch({
+      changes: { from: 0, to: current.state.doc.length, insert: content },
+      selection: EditorSelection.create(
+        selection.ranges.map(range => EditorSelection.range(clamp(range.anchor), clamp(range.head))),
+        selection.mainIndex
+      )
+    });
   });
   $effect(() => {
     if (!view || doc.id !== activeId) return;
