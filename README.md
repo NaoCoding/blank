@@ -45,6 +45,8 @@ npm run tauri build
 
 The native build produces platform packages under `src-tauri/target/release/bundle/`.
 
+Every push to the `release` branch also builds Windows (`.exe`/`.msi`), macOS (`.dmg`/`.app`), and Linux (`.deb`/`.AppImage`) packages with GitHub Actions. Download them from the run's **Artifacts** section on the repository's Actions page. These are unsigned CI builds; macOS may show a security prompt when opening them.
+
 ## Shortcuts
 
 | Action | Windows/Linux | macOS |
