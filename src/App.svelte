@@ -16,7 +16,7 @@
   let fontSize = $state(13); let explorerEnabled = $state(true); let terminalEnabled = $state(true); let previewEnabled = $state(true); let settingsOpen = $state(false);
   let previewHtml = $state(''); let previewError = $state(''); let line = $state(1); let column = $state(1); let toast = $state(''); let showQuickOpen = $state(false); let quickQuery = $state('');
   let TerminalPaneComponent = $state<any>(null);
-  let recentFiles = $state<string[]>([]); let previewTimer: ReturnType<typeof setTimeout>; let filePollInFlight = false;
+  let recentFiles = $state<string[]>([]); let explorerRefreshKey = $state(0); let previewTimer: ReturnType<typeof setTimeout>; let filePollInFlight = false;
   const externalChangeVersions = new Map<string, string>();
   const appWindow = getCurrentWindow();
   let maximized = $state(false);
@@ -49,6 +49,7 @@
         base64Image: btoa(binary),
         extension
       });
+      explorerRefreshKey++;
       return `![alt text](${name})`;
     } catch (error) {
       notify(`Could not save pasted image: ${error}`);
@@ -293,7 +294,8 @@
     void appWindow.onResized(async () => { maximized = await appWindow.isMaximized(); }).then(unlisten => { unlistenResize = unlisten; });
     const handle = (e: BeforeUnloadEvent) => { if (dirtyCount) { e.preventDefault(); e.returnValue = ''; } };
     const filePoll = setInterval(() => { void refreshOpenFiles(); }, 1000);
-    window.addEventListener('beforeunload', handle); return () => { unlistenResize?.(); window.removeEventListener('beforeunload', handle); clearTimeout(previewTimer); clearInterval(filePoll); };
+    const explorerPoll = setInterval(() => { explorerRefreshKey++; }, 2000);
+    window.addEventListener('beforeunload', handle); return () => { unlistenResize?.(); window.removeEventListener('beforeunload', handle); clearTimeout(previewTimer); clearInterval(filePoll); clearInterval(explorerPoll); };
   });
 </script>
 
@@ -302,7 +304,7 @@
   <div class="main-area">
     {#if explorerEnabled && sidebarOpen}<aside class="sidebar" style={`width:${sidebarWidth}px`}>
       <div class="side-heading"><span>EXPLORER</span><button class="icon-button" onclick={createNewFromDialog} title="New file">＋</button></div>
-      {#if workspace}<div class="workspace-label" title={workspace}>{displayWorkspace.toUpperCase()}</div><FileTree path={workspace} onOpen={openFile} />{:else}<div class="empty-sidebar"><span class="empty-glyph">⌂</span><p>Open a folder to browse your files.</p><button class="subtle-button" onclick={chooseWorkspace}>Open Folder</button></div>{/if}
+      {#if workspace}<div class="workspace-label" title={workspace}>{displayWorkspace.toUpperCase()}</div><FileTree path={workspace} refreshKey={explorerRefreshKey} onOpen={openFile} />{:else}<div class="empty-sidebar"><span class="empty-glyph">⌂</span><p>Open a folder to browse your files.</p><button class="subtle-button" onclick={chooseWorkspace}>Open Folder</button></div>{/if}
     </aside><div class="resize-bar vertical" role="separator" onpointerdown={(e) => startResize(e, 'sidebar')}></div>{/if}
     <main class="center-column">
       <div class="tabs-row" role="group" aria-label="Application controls" onpointerdown={handleTitlebarPointerDown}>

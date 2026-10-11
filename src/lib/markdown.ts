@@ -44,7 +44,10 @@ const md = new MarkdownIt({ html: false, linkify: false, breaks: false,
   }
 });
 md.use(taskLists, { enabled: true, label: true, labelAfter: true });
-md.validateLink = (url: string) => /^(https?:|mailto:|#|\/(?!\/)|\.\/|\.\.\/)/i.test(url);
+md.validateLink = (url: string) => {
+  if (/^(https?:|mailto:|#)/i.test(url)) return true;
+  return !/^[a-z][a-z\d+.-]*:/i.test(url) && !url.startsWith('//');
+};
 md.block.ruler.before('fence', 'math_block', mathBlock, { alt: ['paragraph', 'reference'] });
 md.inline.ruler.before('escape', 'math_inline', (state: any, silent: boolean) => {
   const src = state.src.slice(state.pos);
