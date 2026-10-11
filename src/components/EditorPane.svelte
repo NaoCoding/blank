@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { EditorState, StateEffect, type Extension } from '@codemirror/state';
-  import { EditorView, lineNumbers, highlightActiveLine, keymap, highlightSpecialChars, drawSelection, rectangularSelection, crosshairCursor } from '@codemirror/view';
+  import { EditorView, lineNumbers, highlightActiveLine, keymap, highlightSpecialChars, rectangularSelection, crosshairCursor } from '@codemirror/view';
   import { defaultKeymap, history, historyKeymap, indentWithTab } from '@codemirror/commands';
   import { bracketMatching, indentOnInput, syntaxHighlighting, defaultHighlightStyle, StreamLanguage } from '@codemirror/language';
   import type { Document } from '../lib/documents';
@@ -19,8 +19,7 @@
     '.cm-gutters': { backgroundColor: isDark ? '#17191c' : '#fafafa', color: isDark ? '#686d75' : '#9a9da2', border: 'none' },
     '.cm-activeLine': { backgroundColor: isDark ? '#1d2024' : '#f7f8fa' },
     '.cm-activeLineGutter': { color: isDark ? '#c6c8cc' : '#555b63' },
-    '.cm-selectionBackground': { backgroundColor: isDark ? '#374251' : '#d9e5f4' },
-    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': { backgroundColor: isDark ? '#465a72' : '#b7d0ee' },
+    '.cm-content ::selection, .cm-content::selection': { backgroundColor: isDark ? '#465a72' : '#b7d0ee' },
     '::selection': { backgroundColor: isDark ? '#465a72' : '#b7d0ee' },
     '.cm-cursor': { borderLeftColor: isDark ? '#e2e3e6' : '#25282c' },
     '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--mono)' }
@@ -44,7 +43,7 @@
   };
   function createState(): EditorState {
     return getState() ?? EditorState.create({ doc: doc.content, extensions: [
-      lineNumbers(), highlightActiveLine(), highlightSpecialChars(), drawSelection(), history(),
+      lineNumbers(), highlightActiveLine(), highlightSpecialChars(), history(),
       indentOnInput(), bracketMatching(), rectangularSelection(), crosshairCursor(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }), theme(dark, fontSize),
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
@@ -58,7 +57,7 @@
   $effect(() => {
     if (!view) return;
     if (doc.id !== activeId) { const next = getState() ?? EditorState.create({ doc: doc.content, extensions: [
-      lineNumbers(), highlightActiveLine(), highlightSpecialChars(), drawSelection(), history(), indentOnInput(), bracketMatching(),
+      lineNumbers(), highlightActiveLine(), highlightSpecialChars(), history(), indentOnInput(), bracketMatching(),
       syntaxHighlighting(defaultHighlightStyle, { fallback: true }), theme(dark, fontSize),
       keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]),
       EditorView.updateListener.of(update => { if (update.docChanged) onUpdate(update.state.doc.toString(), update.state); if (update.selectionSet || update.docChanged) { const p=update.state.selection.main.head,l=update.state.doc.lineAt(p);onStatus(l.number,p-l.from+1); } })
@@ -70,7 +69,7 @@
     let cancelled = false;
     void langExtension(language).then(lang => {
       if (cancelled || view !== current) return;
-      current.dispatch({ effects: StateEffect.reconfigure.of([lineNumbers(), highlightActiveLine(), highlightSpecialChars(), drawSelection(), history(), indentOnInput(), bracketMatching(), syntaxHighlighting(defaultHighlightStyle, { fallback: true }), lang, theme(isDark, size), keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]), EditorView.updateListener.of(update => { if(update.docChanged) onUpdate(update.state.doc.toString(),update.state); if(update.selectionSet || update.docChanged){const p=update.state.selection.main.head,l=update.state.doc.lineAt(p);onStatus(l.number,p-l.from+1);} })]) });
+      current.dispatch({ effects: StateEffect.reconfigure.of([lineNumbers(), highlightActiveLine(), highlightSpecialChars(), history(), indentOnInput(), bracketMatching(), syntaxHighlighting(defaultHighlightStyle, { fallback: true }), lang, theme(isDark, size), keymap.of([...defaultKeymap, ...historyKeymap, indentWithTab]), EditorView.updateListener.of(update => { if(update.docChanged) onUpdate(update.state.doc.toString(),update.state); if(update.selectionSet || update.docChanged){const p=update.state.selection.main.head,l=update.state.doc.lineAt(p);onStatus(l.number,p-l.from+1);} })]) });
     });
     return () => { cancelled = true; };
   });
