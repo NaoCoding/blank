@@ -39,3 +39,7 @@
 .image-viewer{flex:1;min-width:0;min-height:0;display:grid;place-items:center;overflow:auto;padding:20px;background:var(--bg)}
 .image-viewer img{display:block;max-width:100%;max-height:100%;object-fit:contain}
 .markdown-body img{max-height:70vh;object-fit:contain}
+.explorer-menu-backdrop{position:fixed;inset:0;z-index:20}
+.explorer-context-menu{position:absolute;min-width:164px;padding:4px;border:1px solid var(--line);border-radius:6px;background:var(--panel);box-shadow:0 8px 24px #0006}
+.explorer-context-menu button{display:block;width:100%;padding:8px 10px;border:0;border-radius:4px;background:transparent;color:var(--text);text-align:left;cursor:pointer}
+.explorer-context-menu button:hover,.explorer-context-menu button:focus-visible{outline:0;background:var(--hover)}

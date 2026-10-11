@@ -3,8 +3,9 @@
   import { displayFilePath } from '../lib/paths';
   import FileTree from './FileTree.svelte';
   type Entry = { name: string; path: string; is_dir: boolean };
-  let { path, depth = 0, refreshKey = 0, onOpen } = $props<{ path: string; depth?: number; refreshKey?: number; onOpen: (path: string) => void }>();
+  let { path, depth = 0, refreshKey = 0, onOpen, onDelete } = $props<{ path: string; depth?: number; refreshKey?: number; onOpen: (path: string) => void; onDelete: (path: string) => void }>();
   let entries: Entry[] = $state([]); let expanded = $state(false); let loading = $state(false); let loadRequest = 0;
+  let contextMenu = $state<{ path: string; x: number; y: number } | null>(null);
   async function loadDirectory(directory: string) {
     const request = ++loadRequest;
     loading = true;
@@ -32,12 +33,30 @@
     void refresh;
   });
   function toggle() { expanded = !expanded; }
+  function showContextMenu(event: MouseEvent, filePath: string) {
+    event.preventDefault();
+    event.stopPropagation();
+    const width = 164, height = 42;
+    contextMenu = {
+      path: filePath,
+      x: Math.max(8, Math.min(event.clientX, window.innerWidth - width - 8)),
+      y: Math.max(8, Math.min(event.clientY, window.innerHeight - height - 8))
+    };
+  }
 </script>
+<svelte:window onclick={() => contextMenu = null} onkeydown={(event) => { if (event.key === 'Escape') contextMenu = null; }} />
 <div class="tree-node">
   <button class="tree-row folder-row" style={`--depth:${depth}`} onclick={toggle} title={displayFilePath(path)}>
     <span class="tree-spacer"></span><span class="file-icon folder-icon">{expanded ? '▾' : '▸'}</span><span class="tree-label">{path.split(/[\\/]/).pop()}</span>{#if loading}<span class="muted">…</span>{/if}
   </button>
   {#if expanded}{#each entries as item (item.path)}
-    {#if item.is_dir}<FileTree path={item.path} depth={depth + 1} {refreshKey} {onOpen} />{:else}<button class="tree-row" style={`--depth:${depth + 1}`} onclick={() => onOpen(item.path)} title={displayFilePath(item.path)}><span class="tree-spacer"></span><span class="file-icon">{item.name.endsWith('.md') ? '◈' : '·'}</span><span class="tree-label">{item.name}</span></button>{/if}
+    {#if item.is_dir}<FileTree path={item.path} depth={depth + 1} {refreshKey} {onOpen} {onDelete} />{:else}<button class="tree-row" style={`--depth:${depth + 1}`} onclick={() => onOpen(item.path)} oncontextmenu={(event) => showContextMenu(event, item.path)} title={displayFilePath(item.path)}><span class="tree-spacer"></span><span class="file-icon">{item.name.endsWith('.md') ? '◈' : '·'}</span><span class="tree-label">{item.name}</span></button>{/if}
   {/each}{/if}
 </div>
+{#if contextMenu}
+  <div class="explorer-menu-backdrop" role="presentation" oncontextmenu={(event) => { event.preventDefault(); contextMenu = null; }}>
+    <div class="explorer-context-menu" role="menu" tabindex="-1" style={`left:${contextMenu.x}px;top:${contextMenu.y}px`}>
+      <button role="menuitem" onclick={() => { const filePath = contextMenu?.path; contextMenu = null; if (filePath) onDelete(filePath); }}>Delete</button>
+    </div>
+  </div>
+{/if}

@@ -191,6 +191,31 @@
     documents = documents.filter(d => d.id !== id);
     if (activeId === id) activeId = documents.at(-1)?.id ?? '';
   }
+  async function deleteExplorerFile(path: string) {
+    const openDocument = documents.find(doc => doc.path === path);
+    const name = path.split(/[\\/]/).pop() ?? path;
+    const prompt = openDocument && isDirty(openDocument)
+      ? `Delete ${name} and discard its unsaved changes?`
+      : `Delete ${name}?`;
+    if (!confirm(prompt)) return;
+    try {
+      await invoke('delete_file', { path });
+      if (openDocument) {
+        editorStates.delete(openDocument.id);
+        externalChangeVersions.delete(openDocument.id);
+        documents = documents.filter(doc => doc.id !== openDocument.id);
+        const nextImageSources = { ...imageSources };
+        delete nextImageSources[openDocument.id];
+        imageSources = nextImageSources;
+        if (activeId === openDocument.id) activeId = documents.at(-1)?.id ?? '';
+      }
+      recentFiles = recentFiles.filter(file => file !== path);
+      explorerRefreshKey++;
+      notify(`Deleted ${name}`);
+    } catch (error) {
+      notify(`Could not delete file: ${error}`);
+    }
+  }
   async function createNewFromDialog() {
     if (!workspace) { await chooseWorkspace(); if (!workspace) return; }
     const path = await save({ title: 'Create New File', defaultPath: workspace });
@@ -304,7 +329,7 @@
   <div class="main-area">
     {#if explorerEnabled && sidebarOpen}<aside class="sidebar" style={`width:${sidebarWidth}px`}>
       <div class="side-heading"><span>EXPLORER</span><button class="icon-button" onclick={createNewFromDialog} title="New file">＋</button></div>
-      {#if workspace}<div class="workspace-label" title={workspace}>{displayWorkspace.toUpperCase()}</div><FileTree path={workspace} refreshKey={explorerRefreshKey} onOpen={openFile} />{:else}<div class="empty-sidebar"><span class="empty-glyph">⌂</span><p>Open a folder to browse your files.</p><button class="subtle-button" onclick={chooseWorkspace}>Open Folder</button></div>{/if}
+      {#if workspace}<div class="workspace-label" title={workspace}>{displayWorkspace.toUpperCase()}</div><FileTree path={workspace} refreshKey={explorerRefreshKey} onOpen={openFile} onDelete={deleteExplorerFile} />{:else}<div class="empty-sidebar"><span class="empty-glyph">⌂</span><p>Open a folder to browse your files.</p><button class="subtle-button" onclick={chooseWorkspace}>Open Folder</button></div>{/if}
     </aside><div class="resize-bar vertical" role="separator" onpointerdown={(e) => startResize(e, 'sidebar')}></div>{/if}
     <main class="center-column">
       <div class="tabs-row" role="group" aria-label="Application controls" onpointerdown={handleTitlebarPointerDown}>

@@ -309,6 +309,27 @@ fn create_file(
 }
 
 #[tauri::command]
+fn delete_file(path: String, state: State<'_, AppState>) -> Result<(), String> {
+    let root = state.workspace.lock().map_err(|e| e.to_string())?.clone();
+    let target = PathBuf::from(path);
+    let name = target
+        .file_name()
+        .ok_or("Invalid file path")?
+        .to_os_string();
+    let parent = target.parent().ok_or("Invalid file path")?;
+    let directory = authorized(&root, &parent.to_string_lossy())?;
+    if !directory.is_dir() {
+        return Err("Parent path is not a directory".into());
+    }
+    let target = directory.join(name);
+    let metadata = fs::symlink_metadata(&target).map_err(|e| e.to_string())?;
+    if metadata.file_type().is_dir() {
+        return Err("This action only deletes files".into());
+    }
+    fs::remove_file(target).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 fn start_terminal(
     app: tauri::AppHandle,
     cwd: String,
@@ -428,6 +449,7 @@ pub fn run() {
             save_pasted_image,
             write_file,
             create_file,
+            delete_file,
             start_terminal,
             terminal_write,
             terminal_resize,
