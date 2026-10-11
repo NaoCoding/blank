@@ -116,7 +116,7 @@
   <section class="changes-dialog" role="dialog" aria-modal="true" aria-labelledby="git-changes-title">
     <header class="changes-header">
       <div class="changes-title"><span class="changes-eyebrow">GIT</span><h2 id="git-changes-title">Changes</h2><p title={workspace}>{workspace || 'No folder open'}</p></div>
-      <div class="changes-actions"><button class="history-link" onclick={onHistory}>History</button><button class="changes-refresh" onclick={refresh} disabled={loading} title="Refresh changes" aria-label="Refresh changes">↻</button><button class="changes-close" onclick={onClose} aria-label="Close Git changes">×</button></div>
+      <div class="changes-actions"><button class="history-link" onclick={onHistory}>History</button><button class="changes-refresh" onclick={refresh} disabled={loading} title="Refresh changes" aria-label="Refresh changes"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.1 6.1A5.3 5.3 0 1 0 13.3 9M13.1 2.8v3.7H9.4"/></svg></button><button class="changes-close" onclick={onClose} aria-label="Close Git changes"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="m4.2 4.2 7.6 7.6m0-7.6-7.6 7.6"/></svg></button></div>
     </header>
     <div class="changes-body">
       <aside class="changes-sidebar">
@@ -124,7 +124,7 @@
         {#each stagedChanges as change (`staged-${change.path}`)}
           <div class="change-entry" class:selected={selected?.path === change.path && selected?.staged}>
             <button class="change-file" onclick={() => selectChange(change, true)} title={change.path}><span class="file-status staged">{change.index_status}</span><span>{change.path}</span></button>
-            <button class="stage-action" onclick={() => unstage(change)} title="Unstage file" aria-label={`Unstage ${change.path}`}>−</button>
+            <button class="stage-action" onclick={() => unstage(change)} title="Unstage file" aria-label={`Unstage ${change.path}`}><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M3.5 8h9"/></svg></button>
           </div>
         {/each}
         {#if !stagedChanges.length}<p class="group-empty">No staged files</p>{/if}
@@ -132,7 +132,7 @@
         {#each unstagedChanges as change (`unstaged-${change.path}`)}
           <div class="change-entry" class:selected={selected?.path === change.path && !selected?.staged}>
             <button class="change-file" onclick={() => selectChange(change, false)} title={change.path}><span class="file-status">{change.untracked ? 'U' : change.worktree_status}</span><span>{change.path}</span></button>
-            <button class="stage-action" onclick={() => stage(change)} title="Stage file" aria-label={`Stage ${change.path}`}>＋</button>
+            <button class="stage-action" onclick={() => stage(change)} title="Stage file" aria-label={`Stage ${change.path}`}><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3.5v9m-4.5-4.5h9"/></svg></button>
           </div>
         {/each}
         {#if !unstagedChanges.length}<p class="group-empty">No unstaged files</p>{/if}
@@ -169,8 +169,7 @@
   .changes-actions { display:flex; align-items:center; gap:6px; }
   .changes-actions button { height:32px; min-width:32px; display:grid; place-items:center; padding:0 8px; border:0; border-radius:5px; background:transparent; color:var(--muted); cursor:pointer; }
   .changes-actions button:hover { background:var(--hover); color:var(--text); }
-  .changes-refresh { font-size:18px; }
-  .changes-close { font-size:22px; }
+  .changes-refresh,.changes-close { width:32px; padding:0; }
   .history-link { font-size:calc(var(--ui-font-size,13px) * .85); }
   .changes-body { flex:1; min-height:0; display:flex; }
   .changes-sidebar { flex:none; width:270px; overflow:auto; border-right:1px solid var(--line); padding:8px 0 12px; }
@@ -183,7 +182,8 @@
   .change-file span:last-child { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .file-status { flex:none; width:13px; color:#d6a065; text-align:center; font:600 calc(var(--ui-font-size,13px) * .75) var(--mono); }
   .file-status.staged { color:#7fb6a7; }
-  .stage-action { flex:none; width:24px; height:24px; border:0; border-radius:4px; background:transparent; color:var(--muted); cursor:pointer; font-size:17px; line-height:1; }
+  .stage-action { flex:none; width:24px; height:24px; display:grid; place-items:center; padding:0; border:0; border-radius:4px; background:transparent; color:var(--muted); cursor:pointer; line-height:0; }
+  .stage-action .ui-icon { width:14px; height:14px; stroke-width:1.7; }
   .stage-action:hover { background:var(--hover); color:var(--text); }
   .group-empty { margin:0; padding:4px 12px 8px; color:var(--dim); font-size:calc(var(--ui-font-size,13px) * .77); }
   .diff-panel { min-width:0; flex:1; display:flex; flex-direction:column; }

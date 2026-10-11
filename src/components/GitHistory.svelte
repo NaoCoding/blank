@@ -85,7 +85,7 @@
   <section class="history-dialog" role="dialog" aria-modal="true" aria-labelledby="git-history-title">
     <header class="history-header">
       <div><span class="history-eyebrow">GIT</span><h2 id="git-history-title">Commit history</h2><p title={workspace}>{workspace || 'No folder open'}</p></div>
-      <div class="history-actions"><button class="history-link" onclick={onChanges}>Changes</button><button class="history-refresh" onclick={loadHistory} disabled={loading} title="Refresh history" aria-label="Refresh history">↻</button><button class="history-close" onclick={onClose} aria-label="Close Git history">×</button></div>
+      <div class="history-actions"><button class="history-link" onclick={onChanges}>Changes</button><button class="history-refresh" onclick={loadHistory} disabled={loading} title="Refresh history" aria-label="Refresh history"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M13.1 6.1A5.3 5.3 0 1 0 13.3 9M13.1 2.8v3.7H9.4"/></svg></button><button class="history-close" onclick={onClose} aria-label="Close Git history"><svg class="ui-icon" viewBox="0 0 16 16" aria-hidden="true"><path d="m4.2 4.2 7.6 7.6m0-7.6-7.6 7.6"/></svg></button></div>
     </header>
     {#if loading}
       <div class="history-message">Loading commit history…</div>
@@ -124,8 +124,6 @@
   .history-link { height:32px; border:0; border-radius:5px; padding:0 8px; background:transparent; color:var(--muted); cursor:pointer; font-size:calc(var(--ui-font-size,13px) * .85); }
   .history-link:hover { background:var(--hover); color:var(--text); }
   .history-refresh,.history-close { width:32px; height:32px; display:grid; place-items:center; padding:0; border:0; background:transparent; color:var(--muted); border-radius:5px; cursor:pointer; line-height:1; }
-  .history-refresh { font-size:18px; }
-  .history-close { font-size:22px; }
   .history-refresh:hover,.history-close:hover { background:var(--hover); color:var(--text); }
   .history-message { flex:1; display:grid; place-items:center; padding:24px; color:var(--muted); font-size:var(--ui-font-size,13px); text-align:center; }
   .history-list { flex:1; overflow:auto; padding:8px 18px 10px; }
