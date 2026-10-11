@@ -17,10 +17,11 @@
     '&': { height: '100%', color: isDark ? '#d7d9dc' : '#26282b', backgroundColor: isDark ? '#17191c' : '#ffffff' },
     '.cm-content': { fontFamily: 'var(--mono)', fontSize: `${size}px`, caretColor: isDark ? '#d6a76c' : '#98682d', padding: '14px 0' },
     '.cm-gutters': { backgroundColor: isDark ? '#17191c' : '#fafafa', color: isDark ? '#686d75' : '#9a9da2', border: 'none' },
-    '.cm-activeLine': { backgroundColor: isDark ? '#1d2024' : '#f7f8fa' },
+    '.cm-activeLine': { backgroundColor: isDark ? '#1d202480' : '#f7f8fa80' },
     '.cm-activeLineGutter': { color: isDark ? '#c6c8cc' : '#555b63' },
     '.cm-selectionBackground': { backgroundColor: isDark ? '#374251' : '#d9e5f4' },
-    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': { backgroundColor: isDark ? '#465a72' : '#b7d0ee' },
+    '&dark.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': { backgroundColor: '#465a72' },
+    '&light.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': { backgroundColor: '#b7d0ee' },
     '::selection': { backgroundColor: isDark ? '#465a72' : '#b7d0ee' },
     '.cm-cursor': { borderLeftColor: isDark ? '#e2e3e6' : '#25282c' },
     '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--mono)' }
