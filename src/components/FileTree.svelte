@@ -3,9 +3,31 @@
   import FileTree from './FileTree.svelte';
   type Entry = { name: string; path: string; is_dir: boolean };
   let { path, depth = 0, onOpen } = $props<{ path: string; depth?: number; onOpen: (path: string) => void }>();
-  let entries: Entry[] = $state([]); let expanded = $state(false); let loading = $state(false);
+  let entries: Entry[] = $state([]); let expanded = $state(depth === 0); let loading = $state(false); let loadRequest = 0;
+  async function loadDirectory(directory: string) {
+    const request = ++loadRequest;
+    loading = true;
+    try {
+      const result = await invoke<Entry[]>('list_directory', { path: directory });
+      if (request === loadRequest) entries = result;
+    } catch (e) {
+      console.error(e);
+    } finally {
+      if (request === loadRequest) loading = false;
+    }
+  }
+  $effect(() => {
+    const directory = path;
+    if (depth === 0) {
+      expanded = true;
+      void loadDirectory(directory);
+    } else {
+      expanded = false;
+      entries = [];
+    }
+  });
   async function toggle() {
-    if (!expanded && !entries.length) { loading = true; try { entries = await invoke<Entry[]>('list_directory', { path }); } catch (e) { console.error(e); } finally { loading = false; } }
+    if (!expanded && !entries.length) await loadDirectory(path);
     expanded = !expanded;
   }
 </script>
