@@ -19,7 +19,9 @@
     '.cm-gutters': { backgroundColor: isDark ? '#17191c' : '#fafafa', color: isDark ? '#686d75' : '#9a9da2', border: 'none' },
     '.cm-activeLine': { backgroundColor: isDark ? '#1d2024' : '#f7f8fa' },
     '.cm-activeLineGutter': { color: isDark ? '#c6c8cc' : '#555b63' },
-    '.cm-selectionBackground, ::selection': { backgroundColor: isDark ? '#374251' : '#d9e5f4' },
+    '.cm-selectionBackground': { backgroundColor: isDark ? '#374251' : '#d9e5f4' },
+    '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground': { backgroundColor: isDark ? '#465a72' : '#b7d0ee' },
+    '::selection': { backgroundColor: isDark ? '#465a72' : '#b7d0ee' },
     '.cm-cursor': { borderLeftColor: isDark ? '#e2e3e6' : '#25282c' },
     '.cm-scroller': { overflow: 'auto', fontFamily: 'var(--mono)' }
   }, { dark: isDark });
