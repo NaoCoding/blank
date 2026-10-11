@@ -4,8 +4,8 @@ use std::{
     collections::HashMap,
     fs,
     io::{Read, Write},
-    process::Command,
     path::PathBuf,
+    process::Command,
     sync::Mutex,
     thread,
     time::UNIX_EPOCH,
@@ -66,6 +66,88 @@ struct GitCommit {
     date: String,
     subject: String,
     refs: Vec<String>,
+}
+#[derive(Serialize)]
+struct GitChange {
+    path: String,
+    index_status: String,
+    worktree_status: String,
+    untracked: bool,
+}
+
+fn repository_for_workspace(state: &State<'_, AppState>) -> Result<PathBuf, String> {
+    let workspace = state
+        .workspace
+        .lock()
+        .map_err(|e| e.to_string())?
+        .clone()
+        .ok_or("Open a project folder first")?;
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(workspace)
+        .args(["rev-parse", "--show-toplevel"])
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if !output.status.success() {
+        return Err("This folder is not inside a Git repository".into());
+    }
+    PathBuf::from(String::from_utf8_lossy(&output.stdout).trim())
+        .canonicalize()
+        .map_err(|e| e.to_string())
+}
+
+fn git_changes_for(repository: &std::path::Path) -> Result<Vec<GitChange>, String> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repository)
+        .args(["status", "--porcelain=v1", "--untracked-files=all", "-z"])
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    let mut entries = output
+        .stdout
+        .split(|byte| *byte == 0)
+        .filter(|entry| !entry.is_empty())
+        .peekable();
+    let mut changes = Vec::new();
+    while let Some(entry) = entries.next() {
+        if entry.len() < 4 {
+            continue;
+        }
+        let index_status = entry[0] as char;
+        let worktree_status = entry[1] as char;
+        let path = String::from_utf8_lossy(&entry[3..]).to_string();
+        let untracked = index_status == '?' && worktree_status == '?';
+        changes.push(GitChange {
+            path,
+            index_status: index_status.to_string(),
+            worktree_status: worktree_status.to_string(),
+            untracked,
+        });
+        if matches!(index_status, 'R' | 'C') || matches!(worktree_status, 'R' | 'C') {
+            let _ = entries.next();
+        }
+    }
+    Ok(changes)
+}
+
+fn literal_pathspec(path: &str) -> Result<String, String> {
+    let path = PathBuf::from(path);
+    if path.is_absolute()
+        || path.components().any(|component| {
+            matches!(
+                component,
+                std::path::Component::ParentDir
+                    | std::path::Component::RootDir
+                    | std::path::Component::Prefix(_)
+            )
+        })
+    {
+        return Err("Invalid repository-relative path".into());
+    }
+    Ok(format!(":(literal){}", path.to_string_lossy()))
 }
 
 fn file_version(path: &std::path::Path) -> Result<String, String> {
@@ -252,6 +334,152 @@ fn git_history(state: State<'_, AppState>) -> Result<Vec<GitCommit>, String> {
         });
     }
     Ok(commits)
+}
+
+#[tauri::command]
+fn git_changes(state: State<'_, AppState>) -> Result<Vec<GitChange>, String> {
+    let repository = repository_for_workspace(&state)?;
+    git_changes_for(&repository)
+}
+
+#[tauri::command]
+fn git_file_diff(path: String, staged: bool, state: State<'_, AppState>) -> Result<String, String> {
+    let repository = repository_for_workspace(&state)?;
+    let pathspec = literal_pathspec(&path)?;
+    let changes = git_changes_for(&repository)?;
+    if !staged && changes.iter().any(|change| change.path == path && change.untracked) {
+        let file_path = repository.join(&path);
+        let metadata = fs::symlink_metadata(&file_path).map_err(|e| e.to_string())?;
+        let contents = if metadata.file_type().is_symlink() {
+            fs::read_link(&file_path)
+                .map_err(|e| e.to_string())?
+                .to_string_lossy()
+                .into_owned()
+        } else {
+            let canonical = file_path.canonicalize().map_err(|e| e.to_string())?;
+            if !canonical.starts_with(&repository) {
+                return Err("File is outside the Git repository".into());
+            }
+            fs::read_to_string(canonical)
+                .map_err(|_| "This file is binary or is not valid UTF-8".to_string())?
+        };
+        let lines: Vec<_> = contents.lines().collect();
+        let added_range = if lines.is_empty() {
+            "0,0".to_string()
+        } else {
+            format!("1,{}", lines.len())
+        };
+        let mut diff = format!(
+            "diff --git a/{path} b/{path}\nnew file\n--- /dev/null\n+++ b/{path}\n@@ -0,0 +{added_range} @@\n"
+        );
+        for line in &lines {
+            diff.push('+');
+            diff.push_str(line);
+            diff.push('\n');
+        }
+        if !contents.is_empty() && !contents.ends_with('\n') {
+            diff.push_str("\\ No newline at end of file\n");
+        }
+        return Ok(diff);
+    }
+    let mut command = Command::new("git");
+    command.arg("-C").arg(&repository);
+    if staged {
+        command.arg("diff").arg("--cached");
+    } else {
+        command.arg("diff");
+    }
+    let output = command
+        .args(["--no-ext-diff", "--unified=3", "--", &pathspec])
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+}
+
+#[tauri::command]
+fn git_stage_file(path: String, state: State<'_, AppState>) -> Result<(), String> {
+    let repository = repository_for_workspace(&state)?;
+    let pathspec = literal_pathspec(&path)?;
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repository)
+        .args(["add", "--", &pathspec])
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+#[tauri::command]
+fn git_unstage_file(path: String, state: State<'_, AppState>) -> Result<(), String> {
+    let repository = repository_for_workspace(&state)?;
+    let pathspec = literal_pathspec(&path)?;
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repository)
+        .args(["restore", "--staged", "--", &pathspec])
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(String::from_utf8_lossy(&output.stderr).trim().to_string())
+    }
+}
+
+#[tauri::command]
+fn git_commit(message: String, state: State<'_, AppState>) -> Result<String, String> {
+    let message = message.trim();
+    if message.is_empty() {
+        return Err("Enter a commit message".into());
+    }
+    let repository = repository_for_workspace(&state)?;
+    let staged = Command::new("git")
+        .arg("-C")
+        .arg(&repository)
+        .args(["diff", "--cached", "--quiet"])
+        .status()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if staged.success() {
+        let output = Command::new("git")
+            .arg("-C")
+            .arg(&repository)
+            .args(["add", "--all", "--", "."])
+            .output()
+            .map_err(|e| format!("Could not run Git: {e}"))?;
+        if !output.status.success() {
+            return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+        }
+    } else if staged.code() != Some(1) {
+        return Err("Could not inspect staged changes".into());
+    }
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(&repository)
+        .arg("commit")
+        .arg("-m")
+        .arg(message)
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repository)
+        .args(["rev-parse", "--short", "HEAD"])
+        .output()
+        .map_err(|e| format!("Could not run Git: {e}"))?;
+    if !output.status.success() {
+        return Err(String::from_utf8_lossy(&output.stderr).trim().to_string());
+    }
+    Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
 #[tauri::command]
@@ -614,6 +842,11 @@ pub fn run() {
             set_workspace,
             git_worktrees,
             git_history,
+            git_changes,
+            git_file_diff,
+            git_stage_file,
+            git_unstage_file,
+            git_commit,
             resolve_open_file,
             list_directory,
             read_file,

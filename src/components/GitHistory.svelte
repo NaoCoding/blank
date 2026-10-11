@@ -4,7 +4,7 @@
   type Commit = { hash: string; parents: string[]; author: string; date: string; subject: string; refs: string[] };
   type GraphPath = { d: string; color: number };
   type GraphRow = { commit: Commit; lane: number; color: number; width: number; paths: GraphPath[] };
-  let { workspace, onClose } = $props<{ workspace: string; onClose: () => void }>();
+  let { workspace, onClose, onChanges } = $props<{ workspace: string; onClose: () => void; onChanges: () => void }>();
   let commits = $state<Commit[]>([]);
   let error = $state('');
   let loading = $state(true);
@@ -85,7 +85,7 @@
   <section class="history-dialog" role="dialog" aria-modal="true" aria-labelledby="git-history-title">
     <header class="history-header">
       <div><span class="history-eyebrow">GIT</span><h2 id="git-history-title">Commit history</h2><p title={workspace}>{workspace || 'No folder open'}</p></div>
-      <div class="history-actions"><button class="history-refresh" onclick={loadHistory} disabled={loading} title="Refresh history" aria-label="Refresh history">↻</button><button class="history-close" onclick={onClose} aria-label="Close Git history">×</button></div>
+      <div class="history-actions"><button class="history-link" onclick={onChanges}>Changes</button><button class="history-refresh" onclick={loadHistory} disabled={loading} title="Refresh history" aria-label="Refresh history">↻</button><button class="history-close" onclick={onClose} aria-label="Close Git history">×</button></div>
     </header>
     {#if loading}
       <div class="history-message">Loading commit history…</div>
@@ -121,6 +121,8 @@
   .history-header h2 { margin:3px 0 4px; font-size:calc(var(--ui-font-size,13px) * 1.4); font-weight:600; }
   .history-header p { max-width:70vw; margin:0; overflow:hidden; color:var(--dim); font-size:calc(var(--ui-font-size,13px) * .85); text-overflow:ellipsis; white-space:nowrap; }
   .history-actions { display:flex; align-items:center; gap:6px; }
+  .history-link { height:32px; border:0; border-radius:5px; padding:0 8px; background:transparent; color:var(--muted); cursor:pointer; font-size:calc(var(--ui-font-size,13px) * .85); }
+  .history-link:hover { background:var(--hover); color:var(--text); }
   .history-refresh,.history-close { width:32px; height:32px; display:grid; place-items:center; padding:0; border:0; background:transparent; color:var(--muted); border-radius:5px; cursor:pointer; line-height:1; }
   .history-refresh { font-size:18px; }
   .history-close { font-size:22px; }
